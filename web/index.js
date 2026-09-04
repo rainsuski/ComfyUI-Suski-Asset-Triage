@@ -16,9 +16,6 @@ import { SettingsDialog } from "./components/settings_dialog.js";
 import { ConfirmDialog } from "./components/confirm_dialog.js";
 import { KeybindingManager } from "./services/keybindings.js";
 
-/**
- * 动态加载样式表
- */
 function loadStyleSheet(href) {
   const link = document.createElement("link");
   link.rel = "stylesheet";
@@ -29,9 +26,6 @@ function loadStyleSheet(href) {
 
 loadStyleSheet(new URL("./styles/main.css", import.meta.url).href);
 
-/**
- * 轻量全局 Toast 提示器
- */
 function showToast(message, type = "success") {
   let toast = document.querySelector(".at-toast");
   if (!toast) {
@@ -46,7 +40,6 @@ function showToast(message, type = "success") {
   }, 2500);
 }
 
-// 注册 ComfyUI 前端插件
 app.registerExtension({
   name: "ComfyUI.Suski.AssetTriage",
 
@@ -60,10 +53,10 @@ app.registerExtension({
     const topbarWidget = new TopbarBadgeWidget();
     topbarWidget.mount();
 
-    // 3. 实例化转存参数确认弹窗
+    // 3. 实例化转存参数确认弹窗 (去冗余 category)
     const exportDialog = new ExportDialog({
-      onConfirm: async (items, preset, category) => {
-        const exportPayload = items.map((i) => ({ id: i.id, category }));
+      onConfirm: async (items, preset) => {
+        const exportPayload = items.map((i) => ({ id: i.id }));
         const idsToRemove = items.map((i) => i.id);
 
         const backupItems = [...store.items];
@@ -87,7 +80,7 @@ app.registerExtension({
       onSaved: () => showToast("全局配置已保存生效", "success")
     });
 
-    // 5. 实例化优雅暗黑废弃确认弹窗 (终结原生 confirm)
+    // 5. 实例化销毁确认弹窗
     const confirmDialog = new ConfirmDialog();
 
     // 6. 实例化审片工作台 Modal 核心容器

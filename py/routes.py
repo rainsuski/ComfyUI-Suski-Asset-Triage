@@ -2,7 +2,7 @@
 """
 项目代号: Asset Triage
 文件功能: 注册 PromptServer 的 aiohttp RESTful API 路由，
-          提供缩略图强缓存服务、待审队列拉取、转存/删除调度及设置读写。
+          提供缩略图服务、待审队列实时存活核验 (即时 GC)、转存/删除调度及设置读写。
 """
 
 import json
@@ -40,16 +40,23 @@ class AssetTriageRoutes:
 
     @staticmethod
     async def handle_get_items(request: web.Request) -> web.Response:
-        """GET /asset_triage/items"""
+        """GET /asset_triage/items (含磁盘物理存活核验，剔除 ComfyUI 重启产生的幽灵图片)"""
         items = []
         try:
-            for meta_file in CACHE_META_DIR.glob("*.json"):
+            for meta_file in list(CACHE_META_DIR.glob("*.json")):
+                asset_id = meta_file.stem
                 try:
+                    # 关键：核查 temp 原图物理存活性，若已物理丢失则立即销毁孤儿缓存
+                    temp_file, _, _ = AssetCleaner._resolve_paths_by_id(asset_id)
+                    if not temp_file.is_file():
+                        AssetCleaner.delete_single(asset_id)
+                        continue
+
                     with open(meta_file, "r", encoding="utf-8") as f:
                         data = json.load(f)
                         items.append(
                             {
-                                "id": data.get("id"),
+                                "id": data.get("id", asset_id),
                                 "filename": data.get("filename"),
                                 "subfolder": data.get("subfolder"),
                                 "thumb_url": data.get("thumb_url"),
@@ -63,11 +70,12 @@ class AssetTriageRoutes:
                             }
                         )
                 except Exception as e:
-                    logger.warning(f"读取单个元数据条目失败 [{meta_file.name}]: {e}")
+                    logger.warning(f"读取元数据条目异常 [{meta_file.name}]: {e}")
 
             items.sort(key=lambda x: x["created_at"], reverse=True)
             return web.json_response({"success": True, "items": items})
         except Exception as e:
+            logger.error(f"获取待审列表异常: {e}")
             return web.json_response({"success": False, "error": str(e)}, status=500)
 
     @staticmethod

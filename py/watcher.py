@@ -9,9 +9,10 @@ from concurrent.futures import ThreadPoolExecutor
 import logging
 from pathlib import Path
 from typing import Any, Dict
+import folder_paths
 
 from server import PromptServer
-from ..config import COMFY_TEMP_DIR, WS_EVENT_ITEM_ADDED
+from ..config import WS_EVENT_ITEM_ADDED
 from .processor import ImageProcessor
 
 logger = logging.getLogger("AssetTriage.Watcher")
@@ -50,7 +51,7 @@ class ComfyEventWatcher:
 
     @classmethod
     def _handle_executed_event(cls, data: Dict[str, Any]) -> None:
-        """解析 executed 数据包"""
+        """解析 executed 数据包并实时获取最新临时目录"""
         output_data = data.get("output", {})
         if not isinstance(output_data, dict):
             return
@@ -58,6 +59,9 @@ class ComfyEventWatcher:
         images = output_data.get("images", [])
         if not isinstance(images, list):
             return
+
+        # 动态获取运行时真实 temp 根目录，彻底避免导入时静态变量失效
+        current_temp_dir = Path(folder_paths.get_temp_directory()).resolve()
 
         for img_info in images:
             if not isinstance(img_info, dict):
@@ -72,7 +76,7 @@ class ComfyEventWatcher:
             if not filename:
                 continue
 
-            file_path = (COMFY_TEMP_DIR / subfolder / filename).resolve()
+            file_path = (current_temp_dir / subfolder / filename).resolve()
             _executor.submit(
                 cls._async_process_and_broadcast, file_path, subfolder, filename
             )
@@ -85,7 +89,6 @@ class ComfyEventWatcher:
         try:
             item_data = ImageProcessor.process_file(file_path, subfolder, filename)
             if item_data:
-                # PromptServer.send_sync 本身即为内置的跨线程安全队列发送方法
                 PromptServer.instance.send_sync(WS_EVENT_ITEM_ADDED, item_data)
                 logger.info(f"新资产已就绪并广播: {item_data['id']}")
         except Exception as e:

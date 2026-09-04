@@ -1,7 +1,7 @@
 # py/processor.py
 """
 项目代号: Asset Triage
-文件功能: 异步任务工作线程，生成轻量 WebP 缩略图并写入缓存，保证 Windows 无文件锁冲突。
+文件功能: 异步任务工作线程，生成轻量 WebP 缩略图并写入缓存，持久化原图物理绝对路径。
 """
 
 import hashlib
@@ -45,14 +45,13 @@ class ImageProcessor:
     def process_file(
         cls, file_path: Path, subfolder: str = "", filename: str = ""
     ) -> Optional[Dict[str, Any]]:
-        """
-        对单张图片执行静默预处理
-        """
+        """对单张图片执行静默预处理"""
         if not file_path.is_file():
             logger.warning(f"预处理目标文件不存在: {file_path}")
             return None
 
-        # 采用 BytesIO 读取全部二进制，立即释放操作系统文件句柄 (Windows 防锁)
+        actual_resolved_path = str(file_path.resolve())
+
         try:
             with open(file_path, "rb") as f:
                 raw_bytes = f.read()
@@ -97,11 +96,12 @@ class ImageProcessor:
             logger.error(f"生成缩略图异常 [{asset_id}]: {e}")
             return None
 
-        # 提取结构化元数据并持久化
+        # 提取结构化元数据并持久化物理绝对路径 (orig_path)
         metadata = MetadataParser.parse(img_bytes, file_path)
         metadata.update(
             {
                 "id": asset_id,
+                "orig_path": actual_resolved_path,  # 核心：记录落盘物理绝对路径
                 "filename": actual_filename,
                 "subfolder": subfolder,
                 "width": width,

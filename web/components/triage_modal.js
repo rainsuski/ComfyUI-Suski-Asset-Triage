@@ -2,8 +2,7 @@
 /**
  * 项目代号: Asset Triage
  * 文件功能: 审片管理器全屏模态框核心中枢：
- *          深度三段式工作台结构（品牌顶栏 + 纯净内容视口 + 高效操作底栏），
- *          全量纳管双模切换、设置弹框调度与状态记忆。
+ *          深度三段式工作台结构、预设快捷下拉持久化联动、双模切换与状态记忆。
  */
 
 import { store } from "../services/store.js";
@@ -51,9 +50,7 @@ export class TriageModal {
 
     backdrop.innerHTML = `
       <div class="at-modal-container">
-        <!-- ========================================================
-             1. 模式 A 顶栏 (Header): 品牌标题 + 模式分段器 + 设置/关闭
-             ======================================================== -->
+        <!-- 1. 模式 A 顶栏 (Header) -->
         <header class="at-header-bar at-header-general">
           <div class="at-header-left">
             <div class="at-brand-title">
@@ -70,7 +67,6 @@ export class TriageModal {
           </div>
 
           <div class="at-header-center">
-            <!-- 高级分段控制器 (Segmented Control) -->
             <div class="at-segmented-group">
               <button class="at-segment-btn at-btn-layout-masonry active" title="纵向多列瀑布流 (V)">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
@@ -86,7 +82,7 @@ export class TriageModal {
               </button>
             </div>
 
-            <!-- 转存预设快捷选择器 -->
+            <!-- 转存预设快捷选择器 (持久化) -->
             <div class="at-preset-dropdown-wrap">
               <select class="at-preset-select" title="选择转存预设规则"></select>
             </div>
@@ -108,9 +104,7 @@ export class TriageModal {
           </div>
         </header>
 
-        <!-- ========================================================
-             2. 模式 B 顶栏 (Header): 精审状态与返回
-             ======================================================== -->
+        <!-- 2. 模式 B 顶栏 (Header) -->
         <header class="at-header-bar at-header-inspector at-hidden">
           <div class="at-header-left">
             <button class="at-ghost-btn at-btn-back" title="返回总览列表 (Esc)">
@@ -135,14 +129,10 @@ export class TriageModal {
           </div>
         </header>
 
-        <!-- ========================================================
-             3. 纯净内容视口主区域
-             ======================================================== -->
+        <!-- 3. 内容视口主区域 -->
         <main class="at-viewport-content"></main>
 
-        <!-- ========================================================
-             4. 模式 A 专属底栏 (Footer): 状态统计 + 快捷键指南 + 操作组
-             ======================================================== -->
+        <!-- 4. 模式 A 专属底栏 -->
         <footer class="at-footer-bar at-footer-general">
           <div class="at-footer-left">
             <div class="at-selection-info">
@@ -186,9 +176,7 @@ export class TriageModal {
           </div>
         </footer>
 
-        <!-- ========================================================
-             5. 模式 B 专属底栏 (Footer): 翻页与单张转存
-             ======================================================== -->
+        <!-- 5. 模式 B 专属底栏 -->
         <footer class="at-footer-bar at-footer-inspector at-hidden">
           <div class="at-footer-left">
             <div class="at-shortcuts-guide">
@@ -254,7 +242,6 @@ export class TriageModal {
   _bindDomEvents() {
     const q = (sel) => this.backdrop.querySelector(sel);
 
-    // 全选/反选/清空
     q(".at-btn-select-all").onclick = () => store.selectAll();
     q(".at-btn-invert").onclick = () => store.invertSelection();
     q(".at-btn-clear-selection").onclick = () => {
@@ -262,11 +249,9 @@ export class TriageModal {
       store.dispatchEvent(new CustomEvent("selection_changed"));
     };
 
-    // 模式切换
     q(".at-btn-layout-masonry").onclick = () => store.setViewMode("masonry");
     q(".at-btn-layout-filmstrip").onclick = () => store.setViewMode("filmstrip");
 
-    // 全局设置与关闭
     q(".at-btn-settings").onclick = () => {
       if (this.options.onOpenSettings) {
         this.options.onOpenSettings();
@@ -276,12 +261,11 @@ export class TriageModal {
     };
     q(".at-btn-close").onclick = () => store.setModalOpen(false);
 
-    // 预设选择
+    // 核心改进：顶栏切换预设调用 setActivePresetId 实时持久化
     this.presetSelect.onchange = (e) => {
-      store.activePresetId = e.target.value;
+      store.setActivePresetId(e.target.value);
     };
 
-    // 批量转存与删除
     q(".at-btn-export-batch").onclick = () => {
       if (this.options.onExportBatch) this.options.onExportBatch();
     };
@@ -289,7 +273,6 @@ export class TriageModal {
       if (this.options.onDeleteBatch) this.options.onDeleteBatch();
     };
 
-    // 精审模式内部事件
     q(".at-btn-back").onclick = () => {
       store.setViewMode(store.settings.default_view || "masonry");
     };
@@ -332,6 +315,12 @@ export class TriageModal {
     store.addEventListener("presets_updated", (e) => {
       this._updatePresetDropdown(e.detail.presets);
     });
+
+    store.addEventListener("active_preset_changed", (e) => {
+      if (this.presetSelect.value !== e.detail.activePresetId) {
+        this.presetSelect.value = e.detail.activePresetId;
+      }
+    });
   }
 
   _updatePresetDropdown(presets) {
@@ -351,6 +340,8 @@ export class TriageModal {
       if (p.id === store.activePresetId) opt.selected = true;
       this.presetSelect.appendChild(opt);
     });
+
+    this.presetSelect.value = store.activePresetId;
   }
 
   refreshView() {
@@ -420,21 +411,16 @@ export class TriageModal {
     const selectedCount = store.selectedIds.size;
     const totalCount = store.items.length;
 
-    // 更新顶栏收件箱总数
     this.counterGeneralBadge.textContent = `待审收件箱: ${totalCount}`;
-
-    // 更新底栏已选统计
     this.counterSelectedText.textContent = String(selectedCount);
     const totalCountEl = this.backdrop.querySelector(".at-total-count");
     if (totalCountEl) totalCountEl.textContent = String(totalCount);
 
-    // 批量转存按钮动态响应
     const exportBatchBtn = this.backdrop.querySelector(".at-btn-export-batch");
     const exportLabel = this.backdrop.querySelector(".at-export-label");
     if (exportLabel) exportLabel.textContent = `批量转存 (${selectedCount})`;
     exportBatchBtn.disabled = selectedCount === 0;
 
-    // 精审模式状态同步
     if (store.viewMode === "inspector" && store.activeItem) {
       const activeId = store.activeItem.id;
       const index = store.items.findIndex((i) => i.id === activeId);

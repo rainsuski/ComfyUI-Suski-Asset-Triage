@@ -23,7 +23,7 @@ class PresetManager:
 
     @classmethod
     def get_presets(cls) -> List[Dict[str, Any]]:
-        """获取全部转存预设列表"""
+        """获取全部转存预设列表，自动兼容升级旧数据结构"""
         if not CACHE_PRESETS_FILE.exists():
             cls.save_presets([DEFAULT_PRESET])
             return [DEFAULT_PRESET]
@@ -32,6 +32,31 @@ class PresetManager:
             with open(CACHE_PRESETS_FILE, "r", encoding="utf-8") as f:
                 presets = json.load(f)
                 if isinstance(presets, list) and len(presets) > 0:
+                    migrated = False
+                    for p in presets:
+                        # 自动升级旧版分开的 path_template / name_template 为单合一 template
+                        if "template" not in p:
+                            path_part = p.get(
+                                "path_template", "%date%/%category%"
+                            ).strip("/\\")
+                            name_part = p.get(
+                                "name_template", "%date%_%seed%_%count%"
+                            ).strip("/\\")
+                            p["template"] = (
+                                f"{path_part}/{name_part}" if path_part else name_part
+                            )
+                            migrated = True
+                        if "embed_workflow" not in p:
+                            p["embed_workflow"] = True
+                            migrated = True
+                        if "embed_prompt" not in p:
+                            p["embed_prompt"] = True
+                            migrated = True
+                        if "embed_lora" not in p:
+                            p["embed_lora"] = True
+                            migrated = True
+                    if migrated:
+                        cls.save_presets(presets)
                     return presets
         except Exception as e:
             logger.error(f"读取预设配置文件异常: {e}")
