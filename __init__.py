@@ -5,7 +5,8 @@
 """
 
 import logging
-from py import AssetCleaner, AssetTriageRoutes, ComfyEventWatcher
+
+from .py import AssetCleaner, AssetTriageRoutes, ComfyEventWatcher
 
 # 配置插件专属 Logger
 logging.basicConfig(level=logging.INFO)

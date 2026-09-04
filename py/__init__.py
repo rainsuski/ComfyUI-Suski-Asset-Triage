@@ -4,13 +4,13 @@
 文件功能: 后端核心功能包初始化入口，集中导出核心服务组件与生命周期引擎。
 """
 
-from py.watcher import ComfyEventWatcher
-from py.processor import ImageProcessor
-from py.meta_parser import MetadataParser
-from py.exporter import AssetExporter
-from py.cleaner import AssetCleaner
-from py.presets import PresetManager
-from py.routes import AssetTriageRoutes
+from .cleaner import AssetCleaner
+from .exporter import AssetExporter
+from .meta_parser import MetadataParser
+from .presets import PresetManager
+from .processor import ImageProcessor
+from .routes import AssetTriageRoutes
+from .watcher import ComfyEventWatcher
 
 __all__ = [
     "ComfyEventWatcher",
