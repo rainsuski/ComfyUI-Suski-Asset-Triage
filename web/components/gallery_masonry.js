@@ -1,7 +1,7 @@
 // web/components/gallery_masonry.js
 /**
  * 项目代号: Asset Triage
- * 文件功能: 模式 A-1：极简纵向瀑布流组件，集成 IntersectionObserver 懒加载与零感知 DOM 渲染。
+ * 文件功能: 模式 A-1：真·纵向多列动态平衡瀑布流组件，集成贪心列高算法与 IntersectionObserver 懒加载。
  */
 
 import { store } from "../services/store.js";
@@ -10,8 +10,14 @@ export class GalleryMasonry {
   constructor() {
     this.container = document.createElement("div");
     this.container.className = "at-masonry-container";
+
     this.observer = null;
+    this.resizeObserver = null;
+    this.currentColCount = 0;
+    this.cachedCards = []; // 缓存当前卡片引用，便于列数变化时秒级重排
+
     this._initIntersectionObserver();
+    this._initResizeObserver();
   }
 
   _initIntersectionObserver() {
@@ -29,37 +35,114 @@ export class GalleryMasonry {
           }
         });
       },
-      { rootMargin: "200px 0px" }
+      { rootMargin: "300px 0px" }
     );
   }
 
+  _initResizeObserver() {
+    this.resizeObserver = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const width = entry.contentRect.width;
+        if (width <= 0) continue;
+
+        const targetCols = this._calcColumnCount(width);
+        if (targetCols !== this.currentColCount && this.cachedCards.length > 0) {
+          this._relayout(targetCols);
+        }
+      }
+    });
+    this.resizeObserver.observe(this.container);
+  }
+
+  /**
+   * 根据当前容器宽度动态计算理想列数 (单列最小约 220px)
+   */
+  _calcColumnCount(containerWidth) {
+    const minColWidth = 220;
+    const gap = 14;
+    const padding = 32; // 左右各 16px
+    const availableWidth = Math.max(minColWidth, containerWidth - padding);
+    const cols = Math.floor((availableWidth + gap) / (minColWidth + gap));
+    return Math.max(1, Math.min(cols, 10)); // 限制在 1 ~ 10 列
+  }
+
   render() {
-    // 渲染前显式解绑历史观察对象，杜绝内存泄漏
     if (this.observer) {
       this.observer.disconnect();
     }
 
     this.container.innerHTML = "";
+    this.cachedCards = [];
     const items = store.items;
 
     if (items.length === 0) {
       this.container.innerHTML = `
-        <div class="at-empty-state" style="grid-column: 1 / -1;">
+        <div class="at-empty-state">
           <svg width="48" height="48" viewBox="0 0 24 24" fill="currentColor">
             <path d="M19 5v14H5V5h14m0-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-4.86 8.86l-3 3.87L9 13.14 6 17h12l-3.86-5.14z"/>
           </svg>
           <div style="font-size: 15px;">待审收件箱已清空 (Inbox Zero)</div>
         </div>
       `;
+      this.currentColCount = 0;
       return this.container;
     }
 
+    // 获取视口预估宽度 (如容器尚未完成初次布局，降级使用 window 宽度)
+    const containerWidth = this.container.clientWidth || (window.innerWidth * 0.95);
+    const colCount = this._calcColumnCount(containerWidth);
+
+    // 构建各列并实例化卡片
     items.forEach((item) => {
       const card = this._createCardElement(item);
-      this.container.appendChild(card);
+      const ratio = item.width && item.height ? (item.height / item.width) : 1;
+      this.cachedCards.push({ card, ratio, item });
     });
 
+    this._distributeCards(colCount);
     return this.container;
+  }
+
+  /**
+   * 贪心算法：将卡片依次分发到当前累积高度最短的那一列
+   */
+  _distributeCards(colCount) {
+    this.currentColCount = colCount;
+    this.container.innerHTML = "";
+
+    const columns = [];
+    const columnHeights = new Array(colCount).fill(0);
+
+    for (let i = 0; i < colCount; i++) {
+      const colEl = document.createElement("div");
+      colEl.className = "at-masonry-col";
+      columns.push(colEl);
+      this.container.appendChild(colEl);
+    }
+
+    this.cachedCards.forEach(({ card, ratio }) => {
+      // 寻找当前高度最小的列
+      let minIdx = 0;
+      let minHeight = columnHeights[0];
+      for (let i = 1; i < colCount; i++) {
+        if (columnHeights[i] < minHeight) {
+          minHeight = columnHeights[i];
+          minIdx = i;
+        }
+      }
+
+      columns[minIdx].appendChild(card);
+      // 累加高度估算值 (高宽比 + 间距等效权重)
+      columnHeights[minIdx] += ratio + 0.05;
+    });
+  }
+
+  /**
+   * 容器尺寸发生跃迁时，无重绘快速重排
+   */
+  _relayout(newColCount) {
+    if (newColCount <= 0 || newColCount === this.currentColCount) return;
+    this._distributeCards(newColCount);
   }
 
   _createCardElement(item) {
@@ -68,7 +151,7 @@ export class GalleryMasonry {
     card.className = `at-card ${isSelected ? "selected" : ""}`;
     card.setAttribute("data-id", item.id);
 
-    const aspectRatio = item.width && item.height ? (item.width / item.height).toFixed(3) : "1";
+    const aspectRatio = item.width && item.height ? (item.width / item.height).toFixed(4) : "1";
     card.style.aspectRatio = aspectRatio;
 
     card.innerHTML = `
@@ -125,6 +208,9 @@ export class GalleryMasonry {
   destroy() {
     if (this.observer) {
       this.observer.disconnect();
+    }
+    if (this.resizeObserver) {
+      this.resizeObserver.disconnect();
     }
   }
 }

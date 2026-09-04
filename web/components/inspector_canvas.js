@@ -2,7 +2,7 @@
 /**
  * 项目代号: Asset Triage
  * 文件功能: 模式 B：交互式看图画布组件：
- *          支持以鼠标为原点的平滑滚轮缩放、抓手拖拽平移、100%点对点切换与相邻原图静默预加载 (Preload)。
+ *          支持鼠标原点平滑缩放、抓手平移、1:1像素点对点、ResizeObserver自适应与抗全局样式冲突。
  */
 
 import { store } from "../services/store.js";
@@ -14,6 +14,9 @@ export class InspectorCanvas {
 
     this.imgElement = document.createElement("img");
     this.imgElement.className = "at-canvas-image";
+    // 强制消除 Tailwind / 全局 CSS 的 max-width 干扰
+    this.imgElement.style.maxWidth = "none";
+    this.imgElement.style.maxHeight = "none";
 
     // 悬浮 HUD 状态
     this.hudElement = document.createElement("div");
@@ -22,7 +25,7 @@ export class InspectorCanvas {
     this.container.appendChild(this.imgElement);
     this.container.appendChild(this.hudElement);
 
-    // 变换状态量 (平移与缩放)
+    // 变换状态量
     this.scale = 1;
     this.translateX = 0;
     this.translateY = 0;
@@ -30,27 +33,37 @@ export class InspectorCanvas {
     this.startX = 0;
     this.startY = 0;
 
-    // 当前大图自然分辨率
     this.naturalWidth = 0;
     this.naturalHeight = 0;
+    this.resizeObserver = null;
 
     this._bindEvents();
+    this._initResizeObserver();
   }
 
-  /**
-   * 绑定鼠标滚轮、平移拖拽与双击事件
-   */
+  _initResizeObserver() {
+    this.resizeObserver = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        if (entry.contentRect.width > 50 && entry.contentRect.height > 50) {
+          if (this.naturalWidth > 0 && this.naturalHeight > 0) {
+            this.fitToScreen();
+          }
+        }
+      }
+    });
+    this.resizeObserver.observe(this.container);
+  }
+
   _bindEvents() {
-    // 1. 鼠标按下开始拖拽
+    // 鼠标拖拽平移
     this.container.addEventListener("mousedown", (e) => {
-      if (e.button !== 0) return; // 仅左键可拖动画布
+      if (e.button !== 0) return;
       this.isDragging = true;
       this.startX = e.clientX - this.translateX;
       this.startY = e.clientY - this.translateY;
       this.container.classList.add("dragging");
     });
 
-    // 2. 鼠标移动执行平移
     window.addEventListener("mousemove", (e) => {
       if (!this.isDragging) return;
       this.translateX = e.clientX - this.startX;
@@ -58,7 +71,6 @@ export class InspectorCanvas {
       this._applyTransform();
     });
 
-    // 3. 鼠标抬起结束拖拽
     window.addEventListener("mouseup", () => {
       if (this.isDragging) {
         this.isDragging = false;
@@ -66,7 +78,7 @@ export class InspectorCanvas {
       }
     });
 
-    // 4. 以鼠标当前光标为轴心的等比平滑缩放 (Zoom to Pointer)
+    // 鼠标为中心等比滚轮缩放
     this.container.addEventListener(
       "wheel",
       (e) => {
@@ -75,11 +87,9 @@ export class InspectorCanvas {
         const mouseX = e.clientX - rect.left;
         const mouseY = e.clientY - rect.top;
 
-        // 计算当前缩放比例因子 (适配触控板平滑捏合与级进滚轮)
         const zoomFactor = e.deltaY < 0 ? 1.15 : 0.85;
-        const newScale = Math.min(Math.max(this.scale * zoomFactor, 0.1), 16);
+        const newScale = Math.min(Math.max(this.scale * zoomFactor, 0.05), 32);
 
-        // 调整平移位移，确保鼠标所在像素点缩放前后保持不动
         this.translateX = mouseX - (mouseX - this.translateX) * (newScale / this.scale);
         this.translateY = mouseY - (mouseY - this.translateY) * (newScale / this.scale);
         this.scale = newScale;
@@ -90,7 +100,7 @@ export class InspectorCanvas {
       { passive: false }
     );
 
-    // 5. 双击自适应尺寸与 100% 像素点对点之间切换
+    // 双击切换
     this.container.addEventListener("dblclick", () => {
       if (Math.abs(this.scale - 1) < 0.05) {
         this.fitToScreen();
@@ -101,41 +111,52 @@ export class InspectorCanvas {
   }
 
   /**
-   * 加载指定资产的原生大图，并触发相邻资产静默预加载
-   * @param {Object} item 
+   * 加载大图并启动自适应居中呈现
    */
   loadImage(item) {
     if (!item) return;
 
-    // 构建 ComfyUI 原生临时目录原图访问 URL
     const fullImageUrl = `/view?filename=${encodeURIComponent(item.filename)}&subfolder=${encodeURIComponent(item.subfolder || "")}&type=temp`;
 
-    this.imgElement.style.display = "none";
+    this.imgElement.style.opacity = "0";
     this.imgElement.src = fullImageUrl;
 
-    this.imgElement.onload = () => {
-      this.naturalWidth = this.imgElement.naturalWidth;
-      this.naturalHeight = this.imgElement.naturalHeight;
-      this.imgElement.style.display = "block";
-      this.fitToScreen();
-      // 触发前后相邻原图静默预加载
+    const onReady = () => {
+      this.naturalWidth = this.imgElement.naturalWidth || item.width || 1024;
+      this.naturalHeight = this.imgElement.naturalHeight || item.height || 1024;
+      this.imgElement.style.opacity = "1";
+
+      // 延时至 DOM 容器回流完成后执行居中适应
+      requestAnimationFrame(() => {
+        this.fitToScreen();
+      });
+
       this._preloadAdjacentImages();
     };
+
+    if (this.imgElement.complete && this.imgElement.naturalWidth > 0) {
+      onReady();
+    } else {
+      this.imgElement.onload = onReady;
+      this.imgElement.onerror = () => {
+        // 大图读取异常时降级尝试缩略图
+        if (item.thumb_url && this.imgElement.src !== item.thumb_url) {
+          this.imgElement.src = item.thumb_url;
+        }
+      };
+    }
   }
 
-  /**
-   * 自适应铺满视口居中呈现 (Fit to Screen)
-   */
   fitToScreen() {
     const containerW = this.container.clientWidth;
     const containerH = this.container.clientHeight;
-    if (!this.naturalWidth || !this.naturalHeight || !containerW || !containerH) return;
+    if (!this.naturalWidth || !this.naturalHeight || containerW < 50 || containerH < 50) return;
 
-    const scaleX = (containerW * 0.9) / this.naturalWidth;
-    const scaleY = (containerH * 0.9) / this.naturalHeight;
-    this.scale = Math.min(scaleX, scaleY, 1); // 默认放大不超过 100%
+    const paddingFactor = 0.92;
+    const scaleX = (containerW * paddingFactor) / this.naturalWidth;
+    const scaleY = (containerH * paddingFactor) / this.naturalHeight;
+    this.scale = Math.min(scaleX, scaleY, 1);
 
-    // 居中计算
     this.translateX = (containerW - this.naturalWidth * this.scale) / 2;
     this.translateY = (containerH - this.naturalHeight * this.scale) / 2;
 
@@ -143,9 +164,6 @@ export class InspectorCanvas {
     this._updateHud();
   }
 
-  /**
-   * 切换至 100% 真实像素尺寸居中 (1:1 Pixel Match)
-   */
   zoomToActualSize() {
     const containerW = this.container.clientWidth;
     const containerH = this.container.clientHeight;
@@ -168,13 +186,12 @@ export class InspectorCanvas {
       <span class="at-canvas-hud-btn" data-action="actual">100% 像素</span>
     `;
 
-    this.hudElement.querySelector('[data-action="fit"]').onclick = () => this.fitToScreen();
-    this.hudElement.querySelector('[data-action="actual"]').onclick = () => this.zoomToActualSize();
+    const fitBtn = this.hudElement.querySelector('[data-action="fit"]');
+    const actualBtn = this.hudElement.querySelector('[data-action="actual"]');
+    if (fitBtn) fitBtn.onclick = () => this.fitToScreen();
+    if (actualBtn) actualBtn.onclick = () => this.zoomToActualSize();
   }
 
-  /**
-   * 前后相邻原图静默预加载 (杜绝左右快速翻页白屏)
-   */
   _preloadAdjacentImages() {
     const items = store.items;
     const activeItem = store.activeItem;
@@ -183,11 +200,7 @@ export class InspectorCanvas {
     const currentIndex = items.findIndex((i) => i.id === activeItem.id);
     if (currentIndex === -1) return;
 
-    // 预拉取前一张与后一张
-    const prevIndex = currentIndex - 1;
-    const nextIndex = currentIndex + 1;
-
-    [prevIndex, nextIndex].forEach((idx) => {
+    [currentIndex - 1, currentIndex + 1].forEach((idx) => {
       if (idx >= 0 && idx < items.length) {
         const item = items[idx];
         const preloadUrl = `/view?filename=${encodeURIComponent(item.filename)}&subfolder=${encodeURIComponent(item.subfolder || "")}&type=temp`;
@@ -199,5 +212,11 @@ export class InspectorCanvas {
 
   getElement() {
     return this.container;
+  }
+
+  destroy() {
+    if (this.resizeObserver) {
+      this.resizeObserver.disconnect();
+    }
   }
 }

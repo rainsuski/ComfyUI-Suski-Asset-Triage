@@ -1,11 +1,11 @@
 /* web/styles/gallery.css */
 /**
  * 项目代号: Asset Triage
- * 文件功能: 审片工作台主浮层、顶栏工具条、瀑布流与高沉浸胶卷流视觉样式
+ * 文件功能: 现代暗黑工作台模态框视觉系统 (Slate Obsidian 配色体系、3 段式布局与统一次级弹窗体系)
  */
 
 /* ---------------------------------------------------------
- * 1. 模态工作台外层容器 (Modal Backdrop & Dialog)
+ * 1. 模态外层遮罩 (Backdrop & Window Frame)
  * --------------------------------------------------------- */
 .at-modal-backdrop {
     position: fixed;
@@ -13,8 +13,9 @@
     left: 0;
     width: 100vw;
     height: 100vh;
-    background-color: var(--at-bg-backdrop, rgba(0, 0, 0, 0.8));
-    backdrop-filter: blur(8px);
+    background-color: rgba(5, 5, 8, 0.85);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
     z-index: 10000;
     display: flex;
     flex-direction: column;
@@ -22,7 +23,7 @@
     justify-content: center;
     opacity: 0;
     pointer-events: none;
-    transition: opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: opacity 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .at-modal-backdrop.active {
@@ -33,135 +34,207 @@
 .at-modal-container {
     width: 95vw;
     height: 92vh;
-    background-color: var(--at-bg-surface, #18181c);
-    border: 1px solid var(--at-border, #33333f);
-    border-radius: 12px;
+    max-width: 1920px;
+    background-color: #0f1013;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 14px;
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
+    box-shadow: 0 24px 60px -12px rgba(0, 0, 0, 0.85),
+        0 0 0 1px rgba(255, 255, 255, 0.04);
+}
+
+/* 隐藏辅助类 */
+.at-hidden {
+    display: none !important;
 }
 
 /* ---------------------------------------------------------
- * 2. 顶部综合控制栏 (Toolbar)
+ * 2. 顶栏 (Header Bar)
  * --------------------------------------------------------- */
-.at-toolbar {
-    height: 54px;
-    min-height: 54px;
-    padding: 0 16px;
-    background-color: #121215;
-    border-bottom: 1px solid var(--at-border, #2e2e38);
+.at-header-bar {
+    height: 52px;
+    min-height: 52px;
+    padding: 0 20px;
+    background-color: #14151a;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 12px;
+    gap: 16px;
     user-select: none;
+    z-index: 5;
 }
 
-.at-toolbar-group {
+.at-header-left,
+.at-header-center,
+.at-header-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+/* 品牌标题与胶囊 */
+.at-brand-title {
     display: flex;
     align-items: center;
     gap: 8px;
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: -0.2px;
+    color: #f4f4f5;
 }
 
-.at-btn {
+.at-brand-icon {
+    width: 18px;
+    height: 18px;
+    color: #3b82f6;
+}
+
+.at-status-pill {
     display: inline-flex;
     align-items: center;
-    justify-content: center;
     gap: 6px;
-    padding: 6px 12px;
-    font-size: 13px;
+    padding: 3px 10px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 9999px;
+    font-size: 11px;
     font-weight: 500;
+    color: #a1a1aa;
+}
+
+.at-status-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background-color: #10b981;
+    box-shadow: 0 0 6px rgba(16, 185, 129, 0.6);
+}
+
+/* 高级分段控制器 (Segmented Control) */
+.at-segmented-group {
+    display: inline-flex;
+    align-items: center;
+    padding: 3px;
+    background: #0b0c0f;
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-radius: 8px;
+    gap: 2px;
+}
+
+.at-segment-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 12px;
+    font-size: 12px;
+    font-weight: 500;
+    border: none;
+    background: transparent;
+    color: #71717a;
     border-radius: 6px;
-    border: 1px solid var(--at-border, #3f3f4e);
-    background-color: #24242c;
-    color: var(--at-text-main, #f3f4f6);
     cursor: pointer;
     transition: all 0.15s ease;
 }
 
-.at-btn:hover {
-    background-color: #32323e;
-    border-color: #555566;
+.at-segment-btn:hover {
+    color: #e4e4e7;
 }
 
-.at-btn.active {
-    background-color: var(--at-accent, #3b82f6);
-    border-color: var(--at-accent, #3b82f6);
+.at-segment-btn.active {
+    background-color: #20222a;
     color: #ffffff;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
 }
 
-.at-btn-danger {
-    background-color: rgba(239, 68, 68, 0.15);
-    border-color: rgba(239, 68, 68, 0.4);
-    color: #f87171;
+/* 预设下拉选择器 */
+.at-preset-dropdown-wrap {
+    position: relative;
 }
 
-.at-btn-danger:hover {
-    background-color: rgba(239, 68, 68, 0.3);
-    border-color: #ef4444;
-    color: #fff;
-}
-
-.at-btn-primary {
-    background-color: var(--at-accent, #3b82f6);
-    border-color: var(--at-accent, #3b82f6);
-    color: #ffffff;
-}
-
-.at-btn-primary:hover {
-    background-color: var(--at-accent-hover, #2563eb);
-}
-
-.at-counter-badge {
+.at-preset-select {
+    appearance: none;
+    -webkit-appearance: none;
+    padding: 6px 30px 6px 12px;
     font-size: 12px;
-    padding: 2px 8px;
-    border-radius: 10px;
-    background-color: #282832;
-    color: var(--at-text-muted, #9ca3af);
-    border: 1px solid #383846;
-}
-
-.at-select {
-    padding: 6px 10px;
-    font-size: 13px;
-    border-radius: 6px;
-    background-color: #24242c;
-    color: #f3f4f6;
-    border: 1px solid #3f3f4e;
+    font-weight: 500;
+    border-radius: 8px;
+    background-color: #1a1b22;
+    color: #d4d4d8;
+    border: 1px solid rgba(255, 255, 255, 0.08);
     outline: none;
     cursor: pointer;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2371717a' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.at-preset-select:hover,
+.at-preset-select:focus {
+    border-color: rgba(255, 255, 255, 0.25);
+    color: #ffffff;
+}
+
+/* 幽灵图标按钮 */
+.at-icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 7px;
+    border: 1px solid transparent;
+    background: transparent;
+    color: #a1a1aa;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.at-icon-btn:hover {
+    background-color: rgba(255, 255, 255, 0.07);
+    color: #ffffff;
+    border-color: rgba(255, 255, 255, 0.08);
 }
 
 /* ---------------------------------------------------------
- * 3. 内容视口主区域
+ * 3. 视口主区域 (Viewport)
  * --------------------------------------------------------- */
 .at-viewport-content {
     flex: 1;
     width: 100%;
-    height: calc(100% - 54px);
+    height: calc(100% - 104px);
     position: relative;
     overflow: hidden;
+    background-color: #0b0c0f;
+    display: flex;
+    flex-direction: column;
 }
 
-/* ---------------------------------------------------------
- * 4. 模式 A-1: 纵向自适应瀑布流 (Masonry Grid)
- * --------------------------------------------------------- */
+/* 模式 A-1: 瀑布流容器 */
 .at-masonry-container {
     width: 100%;
     height: 100%;
     padding: 16px;
     overflow-y: auto;
     box-sizing: border-box;
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
-    grid-auto-rows: max-content;
+    display: flex;
+    flex-direction: row;
+    align-items: flex-start;
     gap: 14px;
 }
 
-/* ---------------------------------------------------------
- * 5. 模式 A-2: 水平高沉浸胶卷流 (Filmstrip)
- * --------------------------------------------------------- */
+.at-masonry-col {
+    flex: 1 1 0;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+/* 模式 A-2: 胶卷流容器 */
 .at-filmstrip-container {
     width: 100%;
     height: 100%;
@@ -177,37 +250,214 @@
 }
 
 /* ---------------------------------------------------------
- * 6. 纯视觉卡片与微交互 (Visual Item Card)
+ * 4. 底栏 (Footer Bar)
+ * --------------------------------------------------------- */
+.at-footer-bar {
+    height: 52px;
+    min-height: 52px;
+    padding: 0 20px;
+    background-color: #14151a;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    user-select: none;
+    z-index: 5;
+}
+
+.at-footer-left {
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+}
+
+.at-selection-info {
+    font-size: 13px;
+    font-weight: 500;
+    color: #a1a1aa;
+}
+
+.at-selected-highlight {
+    font-size: 14px;
+    font-weight: 700;
+    color: #3b82f6;
+}
+
+.at-shortcuts-guide {
+    font-size: 11px;
+    color: #52525b;
+}
+
+.at-shortcuts-guide span {
+    color: #71717a;
+}
+
+.at-footer-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.at-selection-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+/* 文字微链接按钮 */
+.at-text-link-btn {
+    background: transparent;
+    border: none;
+    padding: 4px 8px;
+    font-size: 12px;
+    font-weight: 500;
+    color: #828290;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.at-text-link-btn:hover {
+    color: #ffffff;
+    background-color: rgba(255, 255, 255, 0.05);
+}
+
+.at-footer-divider {
+    width: 1px;
+    height: 16px;
+    background-color: rgba(255, 255, 255, 0.1);
+    margin: 0 2px;
+}
+
+/* 行动操作按钮 */
+.at-action-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 6px 14px;
+    font-size: 12.5px;
+    font-weight: 500;
+    border-radius: 7px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    border: 1px solid transparent;
+    background: #20222a;
+    color: #e4e4e7;
+}
+
+.at-action-btn:hover {
+    background: #2a2c37;
+    color: #ffffff;
+}
+
+.at-btn-danger-ghost {
+    background: rgba(239, 68, 68, 0.08);
+    border-color: rgba(239, 68, 68, 0.25);
+    color: #f87171;
+}
+
+.at-btn-danger-ghost:hover {
+    background: rgba(239, 68, 68, 0.2);
+    border-color: #ef4444;
+    color: #ffffff;
+}
+
+.at-btn-danger {
+    background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+    border-color: rgba(255, 255, 255, 0.1);
+    color: #ffffff;
+    box-shadow: 0 2px 8px rgba(220, 38, 38, 0.35);
+}
+
+.at-btn-danger:hover {
+    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+    box-shadow: 0 4px 14px rgba(220, 38, 38, 0.5);
+}
+
+.at-btn-accent {
+    background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+    border-color: rgba(255, 255, 255, 0.12);
+    color: #ffffff;
+    box-shadow: 0 2px 8px rgba(37, 99, 235, 0.35);
+}
+
+.at-btn-accent:hover:not(:disabled) {
+    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+    box-shadow: 0 4px 14px rgba(37, 99, 235, 0.5);
+    transform: translateY(-1px);
+}
+
+.at-btn-accent:disabled {
+    background: #1c1e26;
+    border-color: rgba(255, 255, 255, 0.05);
+    color: #52525b;
+    cursor: not-allowed;
+    box-shadow: none;
+}
+
+.at-ghost-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    font-size: 12px;
+    font-weight: 500;
+    border-radius: 7px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background-color: #1c1d24;
+    color: #d4d4d8;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.at-ghost-btn:hover {
+    background-color: #272832;
+    color: #ffffff;
+    border-color: rgba(255, 255, 255, 0.15);
+}
+
+.at-ghost-btn.active {
+    background-color: #1e3a8a;
+    border-color: #3b82f6;
+    color: #93c5fd;
+}
+
+/* ---------------------------------------------------------
+ * 5. 纯视觉卡片与微交互 (Visual Item Card)
  * --------------------------------------------------------- */
 .at-card {
     position: relative;
+    width: 100%;
     border-radius: 8px;
     overflow: hidden;
-    background-color: #141417;
+    background-color: #14151b;
     cursor: pointer;
     user-select: none;
-    outline: 2px solid transparent;
-    transition: transform 0.15s ease, outline-color 0.15s ease, box-shadow 0.15s ease;
+    box-sizing: border-box;
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.04);
+    transition: transform 0.18s cubic-bezier(0.16, 1, 0.3, 1),
+        box-shadow 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+    flex-shrink: 0;
 }
 
 .at-card:hover {
     transform: translateY(-2px);
-    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.4);
+    box-shadow: 0 12px 24px -6px rgba(0, 0, 0, 0.7),
+        0 0 0 1px rgba(255, 255, 255, 0.15);
 }
 
-/* 选中高亮状态 */
 .at-card.selected {
-    outline-color: var(--at-accent, #3b82f6);
+    box-shadow: 0 0 0 2px #3b82f6,
+        0 8px 20px -4px rgba(37, 99, 235, 0.4);
 }
 
 .at-card.selected::after {
     content: "";
     position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background-color: rgba(59, 130, 246, 0.15);
+    inset: 0;
+    background-color: rgba(59, 130, 246, 0.12);
     pointer-events: none;
 }
 
@@ -216,11 +466,10 @@
     height: 100%;
     object-fit: cover;
     display: block;
-    background-color: #1f1f26;
-    transition: opacity 0.3s ease;
+    background-color: #181920;
+    transition: opacity 0.25s ease;
 }
 
-/* 胶卷流下的卡片尺寸约束 */
 .at-filmstrip-container .at-card {
     flex: 0 0 auto;
     height: 100%;
@@ -233,7 +482,6 @@
     object-fit: contain;
 }
 
-/* 悬浮操作锚点 (打钩选择与精审放大) */
 .at-card-actions {
     position: absolute;
     top: 8px;
@@ -245,7 +493,7 @@
     pointer-events: none;
     opacity: 0;
     transition: opacity 0.15s ease;
-    z-index: 2;
+    z-index: 3;
 }
 
 .at-card:hover .at-card-actions,
@@ -258,28 +506,30 @@
     width: 28px;
     height: 28px;
     border-radius: 6px;
-    background-color: rgba(0, 0, 0, 0.65);
-    backdrop-filter: blur(4px);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    color: #ffffff;
+    background-color: rgba(15, 16, 20, 0.75);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    color: #f4f4f5;
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    transition: background-color 0.15s ease, transform 0.1s ease;
+    transition: background-color 0.15s ease, transform 0.12s ease;
 }
 
 .at-card-btn:hover {
-    background-color: rgba(0, 0, 0, 0.85);
-    transform: scale(1.1);
+    background-color: rgba(20, 22, 28, 0.95);
+    border-color: rgba(255, 255, 255, 0.35);
+    transform: scale(1.08);
 }
 
 .at-card-btn.check.checked {
-    background-color: var(--at-accent, #3b82f6);
-    border-color: var(--at-accent, #3b82f6);
+    background-color: #2563eb;
+    border-color: #3b82f6;
+    color: #ffffff;
 }
 
-/* 空状态占位提示 */
 .at-empty-state {
     width: 100%;
     height: 100%;
@@ -287,6 +537,183 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    color: var(--at-text-muted, #9ca3af);
-    gap: 12px;
+    color: #52525b;
+    gap: 14px;
+}
+
+/* ---------------------------------------------------------
+ * 6. 全系统统一次级弹窗体系 (Dialog Series)
+ * --------------------------------------------------------- */
+.at-dialog-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background-color: rgba(0, 0, 0, 0.75);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    z-index: 10050;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    user-select: none;
+}
+
+.at-dialog-container {
+    width: 480px;
+    max-width: 90vw;
+    background-color: #14151a;
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    border-radius: 12px;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.9),
+        0 0 0 1px rgba(255, 255, 255, 0.04);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    animation: atDialogPop 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes atDialogPop {
+    from {
+        opacity: 0;
+        transform: scale(0.95) translateY(8px);
+    }
+
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+.at-dialog-header {
+    height: 48px;
+    padding: 0 18px;
+    background-color: #181920;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.at-dialog-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: #f4f4f5;
+}
+
+.at-dialog-body {
+    padding: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.at-form-item {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.at-form-label {
+    font-size: 11.5px;
+    font-weight: 500;
+    color: #a1a1aa;
+}
+
+.at-input {
+    width: 100%;
+    padding: 8px 12px;
+    font-size: 12.5px;
+    border-radius: 7px;
+    background-color: #0b0c0f;
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    color: #ffffff;
+    box-sizing: border-box;
+    outline: none;
+    transition: all 0.15s ease;
+}
+
+.at-input:focus {
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+}
+
+.at-token-preview {
+    padding: 9px 12px;
+    border-radius: 7px;
+    background-color: #0b0c0f;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 11.5px;
+    color: #60a5fa;
+    word-break: break-all;
+    line-height: 1.4;
+}
+
+.at-dialog-info {
+    font-size: 12px;
+    color: #71717a;
+    line-height: 1.4;
+}
+
+.at-export-count-badge {
+    color: #60a5fa;
+    font-weight: 600;
+}
+
+.at-dialog-footer {
+    padding: 12px 18px;
+    background-color: #181920;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
+}
+
+/* 确认弹窗专用样式 */
+.at-confirm-title-wrap {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.at-confirm-icon-box {
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    background: rgba(239, 68, 68, 0.15);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    color: #f87171;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.at-confirm-message {
+    font-size: 13px;
+    line-height: 1.6;
+    color: #d4d4d8;
+}
+
+.at-confirm-count-highlight {
+    font-weight: 700;
+    color: #ef4444;
+    padding: 0 2px;
+}
+
+.at-confirm-checkbox-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11.5px;
+    color: #71717a;
+    cursor: pointer;
+    margin-top: 4px;
+}
+
+.at-confirm-checkbox-label input {
+    cursor: pointer;
+    accent-color: #3b82f6;
 }

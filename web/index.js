@@ -2,7 +2,7 @@
 /**
  * 项目代号: Asset Triage (ComfyUI-Suski-Asset-Triage)
  * 文件功能: ComfyUI 前端 Extension 扩展主入口：
- *          全量实例化通信总线、顶栏图标、工作台模态框、转存浮层、快捷键系统与乐观 UI 回滚链路。
+ *          全量实例化通信总线、顶栏图标、工作台模态框、转存浮层、设置浮层、确认销毁浮层与快捷键系统。
  */
 
 import { app } from "/scripts/app.js";
@@ -12,6 +12,8 @@ import { TriageWebSocket } from "./services/ws.js";
 import { TopbarBadgeWidget } from "./components/topbar_badge.js";
 import { TriageModal } from "./components/triage_modal.js";
 import { ExportDialog } from "./components/export_dialog.js";
+import { SettingsDialog } from "./components/settings_dialog.js";
+import { ConfirmDialog } from "./components/confirm_dialog.js";
 import { KeybindingManager } from "./services/keybindings.js";
 
 /**
@@ -80,8 +82,17 @@ app.registerExtension({
       }
     });
 
-    // 4. 实例化审片工作台 Modal 核心容器
+    // 4. 实例化全局偏好设置弹窗
+    const settingsDialog = new SettingsDialog({
+      onSaved: () => showToast("全局配置已保存生效", "success")
+    });
+
+    // 5. 实例化优雅暗黑废弃确认弹窗 (终结原生 confirm)
+    const confirmDialog = new ConfirmDialog();
+
+    // 6. 实例化审片工作台 Modal 核心容器
     const modal = new TriageModal({
+      onOpenSettings: () => settingsDialog.open(),
       onExportBatch: () => {
         const selectedList = store.items.filter((i) => store.selectedIds.has(i.id));
         if (selectedList.length === 0) return;
@@ -95,31 +106,37 @@ app.registerExtension({
         const selectedIds = Array.from(store.selectedIds);
         if (selectedIds.length === 0) return;
 
-        if (store.settings.confirm_delete) {
-          const ok = confirm(`确定彻底删除选中的 ${selectedIds.length} 张临时图片与对应缓存吗？此操作无法撤销。`);
+        if (store.settings.confirm_delete !== false) {
+          const ok = await confirmDialog.prompt({
+            title: "彻底废弃所选资产",
+            count: selectedIds.length
+          });
           if (!ok) return;
         }
 
         store.optimisticRemove(selectedIds);
-        showToast(`已物理删除 ${selectedIds.length} 张资产`, "success");
+        showToast(`已彻底销毁 ${selectedIds.length} 张资产`, "success");
         await TriageApi.deleteAssets(selectedIds);
       },
       onDeleteSingle: async () => {
         if (!store.activeItem) return;
         const id = store.activeItem.id;
 
-        if (store.settings.confirm_delete) {
-          const ok = confirm(`确定彻底删除当前图片吗？`);
+        if (store.settings.confirm_delete !== false) {
+          const ok = await confirmDialog.prompt({
+            title: "彻底废弃当前资产",
+            count: 1
+          });
           if (!ok) return;
         }
 
         store.optimisticRemove([id]);
-        showToast(`已废弃删除`, "success");
+        showToast(`已废弃销毁`, "success");
         await TriageApi.deleteAssets([id]);
       }
     });
 
-    // 5. 初始化并挂载全局快捷键系统
+    // 7. 初始化并挂载全局快捷键系统
     KeybindingManager.init({
       onExportBatch: () => modal.options.onExportBatch(),
       onExportSingle: () => modal.options.onExportSingle(),
@@ -129,7 +146,7 @@ app.registerExtension({
       onNextItem: () => modal.navigateNext()
     });
 
-    // 6. 冷启动初始数据同步
+    // 8. 冷启动初始数据同步
     try {
       const [items, presets, settings] = await Promise.all([
         TriageApi.getItems(),
@@ -138,7 +155,7 @@ app.registerExtension({
       ]);
 
       store.setPresets(presets);
-      store.settings = settings;
+      store.settings = settings || {};
       store.setItems(items);
 
       console.log(`[AssetTriage] 全系统装配完成，待审有效资产: ${items.length}`);

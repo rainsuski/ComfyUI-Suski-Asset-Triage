@@ -2,7 +2,7 @@
 /**
  * 项目代号: Asset Triage
  * 文件功能: 资产转存确认浮层组件：
- *          支持转存预设切换、临时自定义分类 (%category%) 输入、Token 命名模板实时动态预览。
+ *          全系现代暗黑质感、预设切换、临时分类输入、Token 路径高亮预览与标准行动按钮。
  */
 
 import { store } from "../services/store.js";
@@ -19,44 +19,57 @@ export class ExportDialog {
     this._initDom();
   }
 
-  /**
-   * 构建转存配置弹窗 DOM
-   */
   _initDom() {
     const backdrop = document.createElement("div");
     backdrop.className = "at-dialog-backdrop at-hidden";
 
     backdrop.innerHTML = `
-      <div class="at-dialog-container">
+      <div class="at-dialog-container at-export-dialog-container">
         <div class="at-dialog-header">
-          <span class="at-dialog-title">📥 确认转存资产</span>
-          <button class="at-btn at-btn-close-dialog">✕</button>
+          <div class="at-brand-title">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: #3b82f6;">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="7 10 12 15 17 10"></polyline>
+              <line x1="12" y1="15" x2="12" y2="3"></line>
+            </svg>
+            <span class="at-dialog-title">转存资产配置</span>
+          </div>
+          <button class="at-icon-btn at-btn-close-dialog" title="关闭 (Esc)">✕</button>
         </div>
 
         <div class="at-dialog-body">
           <div class="at-form-item">
-            <label class="at-form-label">当前生效预设</label>
-            <select class="at-select at-dialog-preset-select" style="width: 100%;"></select>
+            <label class="at-form-label">生效规则预设 (Preset)</label>
+            <div class="at-preset-dropdown-wrap" style="width: 100%;">
+              <select class="at-preset-select at-dialog-preset-select" style="width: 100%;"></select>
+            </div>
           </div>
 
           <div class="at-form-item">
             <label class="at-form-label">指定子分类名称 (%category%)</label>
-            <input type="text" class="at-input at-dialog-category-input" placeholder="例如: CharacterDesign, Mech, 角色二创" />
+            <input type="text" class="at-input at-dialog-category-input" placeholder="输入分类名，如: Character, Mech, 角色二创" />
           </div>
 
           <div class="at-form-item">
-            <label class="at-form-label">导出目标路径与命名预览</label>
+            <label class="at-form-label">导出目标路径与文件名预览</label>
             <div class="at-token-preview">output/2026-09-04/Default/...</div>
           </div>
 
           <div class="at-dialog-info">
-            本次将转存并从待审队列移出 <b class="at-export-count" style="color: #60a5fa;">0</b> 张资产。
+            本次转存将移出收件箱并归档 <span class="at-export-count-badge">0</span> 张资产。
           </div>
         </div>
 
         <div class="at-dialog-footer">
-          <button class="at-btn at-btn-cancel-dialog">取消</button>
-          <button class="at-btn at-btn-primary at-btn-confirm-export">开始转存</button>
+          <button class="at-action-btn at-btn-cancel-dialog">取消</button>
+          <button class="at-action-btn at-btn-accent at-btn-confirm-export">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="7 10 12 15 17 10"></polyline>
+              <line x1="12" y1="15" x2="12" y2="3"></line>
+            </svg>
+            <span>开始转存</span>
+          </button>
         </div>
       </div>
     `;
@@ -92,25 +105,20 @@ export class ExportDialog {
     document.body.appendChild(backdrop);
   }
 
-  /**
-   * 呼出转存弹窗
-   * @param {Array} items 目标资产列表
-   */
   open(items) {
     if (!items || items.length === 0) return;
     this.targetItems = items;
 
-    // 填充预设下拉选项
     this.presetSelect.innerHTML = "";
     store.presets.forEach((p) => {
       const opt = document.createElement("option");
       opt.value = p.id;
-      opt.textContent = `${p.name} (${p.format})`;
+      opt.textContent = `${p.name} [${p.format || "PNG"}]`;
       if (p.id === store.activePresetId) opt.selected = true;
       this.presetSelect.appendChild(opt);
     });
 
-    this.backdrop.querySelector(".at-export-count").textContent = String(items.length);
+    this.backdrop.querySelector(".at-export-count-badge").textContent = `${items.length} 张`;
     this._updatePreview();
     this.backdrop.classList.remove("at-hidden");
     this.categoryInput.focus();
@@ -120,9 +128,6 @@ export class ExportDialog {
     this.backdrop.classList.add("at-hidden");
   }
 
-  /**
-   * 实时渲染 Token 替换效果预览
-   */
   _updatePreview() {
     const preset = store.getActivePreset();
     if (!preset) return;

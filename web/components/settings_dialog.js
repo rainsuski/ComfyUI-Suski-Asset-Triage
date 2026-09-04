@@ -1,0 +1,128 @@
+// web/components/settings_dialog.js
+/**
+ * 项目代号: Asset Triage
+ * 文件功能: 全局设置与首选项弹窗组件：
+ *          落实原型 2.1 与 2.2 规范（启动视图、缩略图画质、Token 转存默认格式与误删保护）。
+ */
+
+import { store } from "../services/store.js";
+import { TriageApi } from "../services/api.js";
+
+export class SettingsDialog {
+    constructor(options = {}) {
+        this.options = options;
+        this.backdrop = null;
+        this._initDom();
+    }
+
+    _initDom() {
+        const backdrop = document.createElement("div");
+        backdrop.className = "at-dialog-backdrop at-hidden";
+
+        backdrop.innerHTML = `
+      <div class="at-dialog-container at-settings-dialog-container">
+        <div class="at-dialog-header">
+          <span class="at-dialog-title">⚙ 全局偏好与转存配置</span>
+          <button class="at-icon-btn at-btn-close-settings">✕</button>
+        </div>
+
+        <div class="at-dialog-body">
+          <div class="at-form-item">
+            <label class="at-form-label">默认启动视图</label>
+            <select class="at-select at-set-default-view" style="width: 100%;">
+              <option value="masonry">纵向多列瀑布流 (Masonry)</option>
+              <option value="filmstrip">水平高沉浸胶卷流 (Filmstrip)</option>
+            </select>
+          </div>
+
+          <div class="at-form-item">
+            <label class="at-form-label">预处理缩略图长边规格</label>
+            <select class="at-select at-set-thumb-size" style="width: 100%;">
+              <option value="512">512px (极速省内存，推荐)</option>
+              <option value="768">768px (高清预览)</option>
+              <option value="original">原图尺寸 (直读)</option>
+            </select>
+          </div>
+
+          <div class="at-form-item">
+            <label class="at-form-label">转存默认输出格式</label>
+            <select class="at-select at-set-export-format" style="width: 100%;">
+              <option value="PNG">PNG (无损原图，保留完整 Workflow)</option>
+              <option value="WEBP">WebP (高压缩率，写入 EXIF UserComment)</option>
+              <option value="JPEG">JPEG (标准格式)</option>
+            </select>
+          </div>
+
+          <div class="at-form-item">
+            <label class="at-form-label" style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+              <input type="checkbox" class="at-set-confirm-delete" style="cursor: pointer;" />
+              <span>废弃资产时弹出二次确认对话框</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="at-dialog-footer">
+          <button class="at-action-btn at-btn-cancel-settings">取消</button>
+          <button class="at-action-btn at-btn-accent at-btn-save-settings">保存配置</button>
+        </div>
+      </div>
+    `;
+
+        backdrop.addEventListener("click", (e) => {
+            if (e.target === backdrop) this.close();
+        });
+
+        this.backdrop = backdrop;
+
+        backdrop.querySelector(".at-btn-close-settings").onclick = () => this.close();
+        backdrop.querySelector(".at-btn-cancel-settings").onclick = () => this.close();
+
+        backdrop.querySelector(".at-btn-save-settings").onclick = async () => {
+            await this._handleSave();
+        };
+
+        document.body.appendChild(backdrop);
+    }
+
+    open() {
+        const s = store.settings || {};
+        const q = (sel) => this.backdrop.querySelector(sel);
+
+        q(".at-set-default-view").value = s.default_view || "masonry";
+        q(".at-set-thumb-size").value = String(s.thumbnail_size || 512);
+        q(".at-set-export-format").value = s.default_format || "PNG";
+        q(".at-set-confirm-delete").checked = s.confirm_delete !== false;
+
+        this.backdrop.classList.remove("at-hidden");
+    }
+
+    close() {
+        this.backdrop.classList.add("at-hidden");
+    }
+
+    async _handleSave() {
+        const q = (sel) => this.backdrop.querySelector(sel);
+
+        const payload = {
+            ...store.settings,
+            default_view: q(".at-set-default-view").value,
+            thumbnail_size: parseInt(q(".at-set-thumb-size").value, 10) || 512,
+            default_format: q(".at-set-export-format").value,
+            confirm_delete: q(".at-set-confirm-delete").checked
+        };
+
+        try {
+            if (TriageApi.updateSettings) {
+                await TriageApi.updateSettings(payload);
+            } else if (TriageApi.saveSettings) {
+                await TriageApi.saveSettings(payload);
+            }
+            store.settings = payload;
+            this.close();
+            if (this.options.onSaved) this.options.onSaved();
+        } catch (err) {
+            console.error("[AssetTriage] 保存设置失败:", err);
+            alert("保存设置失败，请查看控制台日志。");
+        }
+    }
+}

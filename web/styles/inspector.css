@@ -1,42 +1,20 @@
 /* web/styles/inspector.css */
 /**
  * 项目代号: Asset Triage
- * 文件功能: 模式 B（深度精审）：全屏分栏视口、交互式画布抓手、元数据侧栏卡片与复制提示动效。
+ * 文件功能: 模式 B（深度精审）：全屏视口分栏、交互画布、参数侧栏与复制动效。
  */
 
 /* ---------------------------------------------------------
- * 1. 精审模式主容器与顶部辅助条
+ * 1. 精审模式视口分栏
  * --------------------------------------------------------- */
-.at-inspector-container {
+.at-inspector-body {
     width: 100%;
     height: 100%;
-    display: flex;
-    flex-direction: column;
-    background-color: #0d0d11;
-    overflow: hidden;
-    user-select: none;
-}
-
-.at-inspector-header {
-    height: 46px;
-    min-height: 46px;
-    padding: 0 16px;
-    background-color: #141419;
-    border-bottom: 1px solid var(--at-border, #2e2e38);
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-}
-
-.at-inspector-body {
-    flex: 1;
-    width: 100%;
-    height: calc(100% - 46px - 48px);
     display: flex;
     flex-direction: row;
     overflow: hidden;
     position: relative;
+    background-color: #0b0c0f;
 }
 
 /* ---------------------------------------------------------
@@ -47,8 +25,14 @@
     height: 100%;
     position: relative;
     overflow: hidden;
-    background: radial-gradient(circle, #1a1a24 10%, #0d0d12 90%);
+    background-color: #0b0c0f;
+    background-image:
+        radial-gradient(circle at 50% 50%, rgba(30, 32, 42, 0.4) 0%, transparent 80%),
+        linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+    background-size: 100% 100%, 32px 32px, 32px 32px;
     cursor: grab;
+    user-select: none;
 }
 
 .at-canvas-wrapper.dragging {
@@ -62,31 +46,43 @@
     transform-origin: 0 0;
     will-change: transform;
     pointer-events: none;
-    image-rendering: -webkit-optimize-contrast;
+    image-rendering: auto;
+    transition: opacity 0.15s ease;
+    display: block !important;
 }
 
-/* 画布悬浮浮动工具提示 (缩放比例与点对点切换) */
+/* 画布悬浮浮动工具提示 */
 .at-canvas-hud {
     position: absolute;
-    bottom: 16px;
-    left: 16px;
-    background-color: rgba(18, 18, 24, 0.75);
-    backdrop-filter: blur(8px);
+    bottom: 20px;
+    left: 20px;
+    background-color: rgba(18, 19, 24, 0.8);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
     border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 6px;
-    padding: 4px 10px;
+    border-radius: 8px;
+    padding: 6px 14px;
     font-size: 12px;
-    color: var(--at-text-muted, #9ca3af);
+    font-weight: 500;
+    color: #a1a1aa;
     pointer-events: none;
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 12px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+    z-index: 10;
 }
 
 .at-canvas-hud-btn {
     pointer-events: auto;
     cursor: pointer;
     color: #60a5fa;
+    text-decoration: none;
+    transition: color 0.15s ease;
+}
+
+.at-canvas-hud-btn:hover {
+    color: #93c5fd;
     text-decoration: underline;
 }
 
@@ -94,26 +90,27 @@
  * 3. 结构化参数右侧栏 (Metadata Sidebar)
  * --------------------------------------------------------- */
 .at-sidebar-wrapper {
-    width: 360px;
-    min-width: 360px;
+    width: 380px;
+    min-width: 380px;
     height: 100%;
-    background-color: #121217;
-    border-left: 1px solid var(--at-border, #2e2e38);
+    background-color: #121318;
+    border-left: 1px solid rgba(255, 255, 255, 0.08);
     display: flex;
     flex-direction: column;
     overflow-y: auto;
     box-sizing: border-box;
-    padding: 16px;
-    gap: 16px;
+    padding: 18px;
+    gap: 14px;
+    z-index: 4;
 }
 
 .at-meta-section {
     display: flex;
     flex-direction: column;
-    gap: 6px;
-    background-color: #181820;
-    border: 1px solid #282834;
-    border-radius: 8px;
+    gap: 8px;
+    background-color: #181920;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 9px;
     padding: 12px;
 }
 
@@ -121,46 +118,50 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 600;
-    color: var(--at-text-muted, #9ca3af);
+    color: #71717a;
     text-transform: uppercase;
     letter-spacing: 0.5px;
 }
 
 .at-copy-btn {
-    padding: 2px 6px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
     font-size: 11px;
-    border-radius: 4px;
-    background-color: #262632;
-    border: 1px solid #3c3c4e;
-    color: #d1d5db;
+    font-weight: 500;
+    border-radius: 5px;
+    background-color: #22232d;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: #d4d4d8;
     cursor: pointer;
     transition: all 0.15s ease;
 }
 
 .at-copy-btn:hover {
-    background-color: #3b82f6;
+    background-color: #2563eb;
     border-color: #3b82f6;
-    color: #fff;
+    color: #ffffff;
 }
 
 .at-meta-text {
     font-size: 12px;
-    line-height: 1.5;
-    color: #e5e7eb;
+    line-height: 1.55;
+    color: #e4e4e7;
     word-break: break-word;
     white-space: pre-wrap;
     max-height: 120px;
     overflow-y: auto;
-    background-color: #111116;
-    padding: 8px;
-    border-radius: 4px;
-    border: 1px solid #22222c;
+    background-color: #111216;
+    padding: 10px;
+    border-radius: 6px;
+    border: 1px solid rgba(255, 255, 255, 0.04);
     user-select: text;
 }
 
-/* 参数网格属性 */
+/* 参数网格 */
 .at-meta-grid {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
@@ -170,27 +171,28 @@
 .at-meta-item {
     display: flex;
     flex-direction: column;
-    background-color: #121217;
-    padding: 6px 8px;
-    border-radius: 4px;
-    border: 1px solid #22222c;
+    gap: 2px;
+    background-color: #121318;
+    padding: 8px 10px;
+    border-radius: 6px;
+    border: 1px solid rgba(255, 255, 255, 0.04);
 }
 
 .at-meta-item-label {
-    font-size: 11px;
-    color: #808090;
+    font-size: 10.5px;
+    color: #71717a;
 }
 
 .at-meta-item-val {
     font-size: 12px;
     font-weight: 600;
-    color: #f3f4f6;
+    color: #f4f4f5;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 
-/* LoRA 标签胶囊列表 */
+/* LoRA 标签 */
 .at-lora-pills {
     display: flex;
     flex-wrap: wrap;
@@ -199,26 +201,12 @@
 
 .at-lora-pill {
     font-size: 11px;
-    padding: 3px 8px;
-    border-radius: 12px;
-    background-color: rgba(59, 130, 246, 0.15);
-    border: 1px solid rgba(59, 130, 246, 0.35);
+    padding: 3px 10px;
+    border-radius: 9999px;
+    background-color: rgba(37, 99, 235, 0.12);
+    border: 1px solid rgba(59, 130, 246, 0.25);
     color: #93c5fd;
     display: inline-flex;
     align-items: center;
     gap: 4px;
-}
-
-/* ---------------------------------------------------------
- * 4. 底部快捷切图与转存底栏 (Footer)
- * --------------------------------------------------------- */
-.at-inspector-footer {
-    height: 48px;
-    min-height: 48px;
-    padding: 0 16px;
-    background-color: #141419;
-    border-top: 1px solid var(--at-border, #2e2e38);
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
 }
