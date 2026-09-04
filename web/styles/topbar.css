@@ -1,0 +1,78 @@
+/* web/styles/topbar.css */
+/* 顶栏图标按钮容器 */
+.asset-triage-topbar-btn {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    padding: 4px;
+    background: transparent;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    color: var(--fg-color, #ccc);
+    transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.asset-triage-topbar-btn:hover {
+    background-color: var(--comfy-menu-bg, rgba(255, 255, 255, 0.1));
+    color: #fff;
+}
+
+/* 选片盒 Minimal SVG 图标 */
+.asset-triage-icon {
+    width: 18px;
+    height: 18px;
+    fill: currentColor;
+}
+
+/* 绝对定位红色角标计数球 (Badge) */
+.asset-triage-badge {
+    position: absolute;
+    top: 1px;
+    right: 1px;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    background-color: #ef4444;
+    /* 鲜明警示红 */
+    color: #ffffff;
+    font-size: 10px;
+    font-weight: 700;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    line-height: 16px;
+    text-align: center;
+    border-radius: 8px;
+    box-shadow: 0 0 4px rgba(239, 68, 68, 0.6);
+    pointer-events: none;
+    display: none;
+    box-sizing: border-box;
+}
+
+.asset-triage-badge.active {
+    display: block;
+}
+
+/* 新图到达弹性放大动效 (Pop Bounce) */
+.asset-triage-badge.pop-bounce {
+    animation: triagePopBounce 0.45s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+@keyframes triagePopBounce {
+    0% {
+        transform: scale(0.6);
+        box-shadow: 0 0 0 rgba(239, 68, 68, 0.8);
+    }
+
+    50% {
+        transform: scale(1.35);
+        box-shadow: 0 0 12px rgba(239, 68, 68, 0.9);
+    }
+
+    100% {
+        transform: scale(1);
+        box-shadow: 0 0 4px rgba(239, 68, 68, 0.6);
+    }
+}

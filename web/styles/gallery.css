@@ -1,0 +1,292 @@
+/* web/styles/gallery.css */
+/**
+ * 项目代号: Asset Triage
+ * 文件功能: 审片工作台主浮层、顶栏工具条、瀑布流与高沉浸胶卷流视觉样式
+ */
+
+/* ---------------------------------------------------------
+ * 1. 模态工作台外层容器 (Modal Backdrop & Dialog)
+ * --------------------------------------------------------- */
+.at-modal-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background-color: var(--at-bg-backdrop, rgba(0, 0, 0, 0.8));
+    backdrop-filter: blur(8px);
+    z-index: 10000;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.at-modal-backdrop.active {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.at-modal-container {
+    width: 95vw;
+    height: 92vh;
+    background-color: var(--at-bg-surface, #18181c);
+    border: 1px solid var(--at-border, #33333f);
+    border-radius: 12px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
+}
+
+/* ---------------------------------------------------------
+ * 2. 顶部综合控制栏 (Toolbar)
+ * --------------------------------------------------------- */
+.at-toolbar {
+    height: 54px;
+    min-height: 54px;
+    padding: 0 16px;
+    background-color: #121215;
+    border-bottom: 1px solid var(--at-border, #2e2e38);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    user-select: none;
+}
+
+.at-toolbar-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.at-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 6px 12px;
+    font-size: 13px;
+    font-weight: 500;
+    border-radius: 6px;
+    border: 1px solid var(--at-border, #3f3f4e);
+    background-color: #24242c;
+    color: var(--at-text-main, #f3f4f6);
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.at-btn:hover {
+    background-color: #32323e;
+    border-color: #555566;
+}
+
+.at-btn.active {
+    background-color: var(--at-accent, #3b82f6);
+    border-color: var(--at-accent, #3b82f6);
+    color: #ffffff;
+}
+
+.at-btn-danger {
+    background-color: rgba(239, 68, 68, 0.15);
+    border-color: rgba(239, 68, 68, 0.4);
+    color: #f87171;
+}
+
+.at-btn-danger:hover {
+    background-color: rgba(239, 68, 68, 0.3);
+    border-color: #ef4444;
+    color: #fff;
+}
+
+.at-btn-primary {
+    background-color: var(--at-accent, #3b82f6);
+    border-color: var(--at-accent, #3b82f6);
+    color: #ffffff;
+}
+
+.at-btn-primary:hover {
+    background-color: var(--at-accent-hover, #2563eb);
+}
+
+.at-counter-badge {
+    font-size: 12px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    background-color: #282832;
+    color: var(--at-text-muted, #9ca3af);
+    border: 1px solid #383846;
+}
+
+.at-select {
+    padding: 6px 10px;
+    font-size: 13px;
+    border-radius: 6px;
+    background-color: #24242c;
+    color: #f3f4f6;
+    border: 1px solid #3f3f4e;
+    outline: none;
+    cursor: pointer;
+}
+
+/* ---------------------------------------------------------
+ * 3. 内容视口主区域
+ * --------------------------------------------------------- */
+.at-viewport-content {
+    flex: 1;
+    width: 100%;
+    height: calc(100% - 54px);
+    position: relative;
+    overflow: hidden;
+}
+
+/* ---------------------------------------------------------
+ * 4. 模式 A-1: 纵向自适应瀑布流 (Masonry Grid)
+ * --------------------------------------------------------- */
+.at-masonry-container {
+    width: 100%;
+    height: 100%;
+    padding: 16px;
+    overflow-y: auto;
+    box-sizing: border-box;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+    grid-auto-rows: max-content;
+    gap: 14px;
+}
+
+/* ---------------------------------------------------------
+ * 5. 模式 A-2: 水平高沉浸胶卷流 (Filmstrip)
+ * --------------------------------------------------------- */
+.at-filmstrip-container {
+    width: 100%;
+    height: 100%;
+    padding: 16px;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: row;
+    align-items: stretch;
+    gap: 14px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    white-space: nowrap;
+}
+
+/* ---------------------------------------------------------
+ * 6. 纯视觉卡片与微交互 (Visual Item Card)
+ * --------------------------------------------------------- */
+.at-card {
+    position: relative;
+    border-radius: 8px;
+    overflow: hidden;
+    background-color: #141417;
+    cursor: pointer;
+    user-select: none;
+    outline: 2px solid transparent;
+    transition: transform 0.15s ease, outline-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.at-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.4);
+}
+
+/* 选中高亮状态 */
+.at-card.selected {
+    outline-color: var(--at-accent, #3b82f6);
+}
+
+.at-card.selected::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(59, 130, 246, 0.15);
+    pointer-events: none;
+}
+
+.at-card-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    background-color: #1f1f26;
+    transition: opacity 0.3s ease;
+}
+
+/* 胶卷流下的卡片尺寸约束 */
+.at-filmstrip-container .at-card {
+    flex: 0 0 auto;
+    height: 100%;
+    width: auto;
+}
+
+.at-filmstrip-container .at-card-img {
+    width: auto;
+    height: 100%;
+    object-fit: contain;
+}
+
+/* 悬浮操作锚点 (打钩选择与精审放大) */
+.at-card-actions {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    right: 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+    z-index: 2;
+}
+
+.at-card:hover .at-card-actions,
+.at-card.selected .at-card-actions {
+    opacity: 1;
+}
+
+.at-card-btn {
+    pointer-events: auto;
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    background-color: rgba(0, 0, 0, 0.65);
+    backdrop-filter: blur(4px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background-color 0.15s ease, transform 0.1s ease;
+}
+
+.at-card-btn:hover {
+    background-color: rgba(0, 0, 0, 0.85);
+    transform: scale(1.1);
+}
+
+.at-card-btn.check.checked {
+    background-color: var(--at-accent, #3b82f6);
+    border-color: var(--at-accent, #3b82f6);
+}
+
+/* 空状态占位提示 */
+.at-empty-state {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: var(--at-text-muted, #9ca3af);
+    gap: 12px;
+}

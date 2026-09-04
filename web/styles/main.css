@@ -1,0 +1,170 @@
+/* web/styles/main.css */
+/**
+ * 项目代号: Asset Triage
+ * 文件功能: 全局设计系统、主题变量、子样式汇集、转存弹窗与 Toast 消息通知
+ */
+
+/* 导入各分拆子样式模块 */
+@import "./topbar.css";
+@import "./gallery.css";
+@import "./inspector.css";
+
+/* ---------------------------------------------------------
+ * 1. 主题变量与重置
+ * --------------------------------------------------------- */
+:root {
+    --at-bg-backdrop: rgba(0, 0, 0, 0.78);
+    --at-bg-surface: #16161a;
+    --at-bg-card: #202027;
+    --at-bg-hover: #2c2c36;
+    --at-border: #353542;
+    --at-accent: #3b82f6;
+    --at-accent-hover: #2563eb;
+    --at-danger: #ef4444;
+    --at-danger-hover: #dc2626;
+    --at-text-main: #f3f4f6;
+    --at-text-muted: #9ca3af;
+    --at-radius: 8px;
+}
+
+.at-hidden {
+    display: none !important;
+}
+
+/* ---------------------------------------------------------
+ * 2. 转存确认弹窗 (Export Dialog)
+ * --------------------------------------------------------- */
+.at-dialog-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background-color: rgba(0, 0, 0, 0.65);
+    backdrop-filter: blur(4px);
+    z-index: 10001;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.at-dialog-container {
+    width: 460px;
+    background-color: #1a1a22;
+    border: 1px solid #383848;
+    border-radius: 10px;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.6);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.at-dialog-header {
+    padding: 14px 16px;
+    background-color: #121217;
+    border-bottom: 1px solid #2e2e3a;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.at-dialog-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: #f3f4f6;
+}
+
+.at-dialog-body {
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.at-form-item {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.at-form-label {
+    font-size: 12px;
+    font-weight: 500;
+    color: #9ca3af;
+}
+
+.at-input {
+    width: 100%;
+    padding: 8px 10px;
+    font-size: 13px;
+    border-radius: 6px;
+    background-color: #111116;
+    border: 1px solid #383848;
+    color: #f3f4f6;
+    box-sizing: border-box;
+    outline: none;
+}
+
+.at-input:focus {
+    border-color: var(--at-accent);
+}
+
+.at-token-preview {
+    font-size: 11px;
+    font-family: monospace;
+    padding: 8px;
+    border-radius: 4px;
+    background-color: #111116;
+    border: 1px dashed #3f3f50;
+    color: #a5b4fc;
+    word-break: break-all;
+}
+
+.at-dialog-info {
+    font-size: 12px;
+    color: #9ca3af;
+}
+
+.at-dialog-footer {
+    padding: 12px 16px;
+    background-color: #121217;
+    border-top: 1px solid #2e2e3a;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+/* ---------------------------------------------------------
+ * 3. 全局 Toast 提示组件
+ * --------------------------------------------------------- */
+.at-toast {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    padding: 10px 16px;
+    border-radius: 6px;
+    background-color: #1e1e28;
+    color: #fff;
+    border: 1px solid #383848;
+    font-size: 13px;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
+    z-index: 10002;
+    opacity: 0;
+    transform: translateY(10px);
+    transition: opacity 0.2s ease, transform 0.2s ease;
+    pointer-events: none;
+}
+
+.at-toast.active {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.at-toast.success {
+    border-left: 4px solid #10b981;
+}
+
+.at-toast.error {
+    border-left: 4px solid #ef4444;
+}
