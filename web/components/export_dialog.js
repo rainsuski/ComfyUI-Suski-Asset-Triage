@@ -66,7 +66,7 @@ export class ExportDialog {
           <div class="at-form-item">
             <label class="at-form-label" style="font-weight: 600; margin-bottom: 4px;">转存相对路径与文件名模板</label>
             <input type="text" class="at-input at-dialog-template-input" 
-                   placeholder="如: 木梨/sfw/%model:30%/%seed% 或 %date%/%model%_%count%" 
+                   placeholder="如: 角色名/sfw/%model:30%/%seed% 或 %date%/%model%_%count%" 
                    style="font-family: monospace; font-size: 12px; margin-bottom: 6px;" />
             <!-- 快捷 Token 点击标签 -->
             <div class="at-token-chips" style="display: flex; flex-wrap: wrap; gap: 4px;">

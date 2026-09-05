@@ -385,3 +385,57 @@
     color: #60a5fa;
     font-weight: 600;
 }
+
+/* ---------------------------------------------------------
+ * 4. 精审模式底栏右侧流水线：“选择”切换按钮
+ * --------------------------------------------------------- */
+.at-footer-inspector .at-btn-inspect-check {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 0 13px;
+    height: 32px;
+    font-size: 12px;
+    font-weight: 500;
+    border-radius: 6px;
+    background-color: #161822;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    color: #a1a1aa;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    user-select: none;
+    box-sizing: border-box;
+}
+
+.at-footer-inspector .at-btn-inspect-check:hover {
+    background-color: #20222f;
+    border-color: rgba(255, 255, 255, 0.22);
+    color: #f4f4f5;
+}
+
+.at-footer-inspector .at-btn-inspect-check .at-icon-checked {
+    display: none;
+}
+
+.at-footer-inspector .at-btn-inspect-check .at-icon-unchecked {
+    display: block;
+    color: #71717a;
+}
+
+/* 激活点亮态 (整钮发光高亮，零宽度突变) */
+.at-footer-inspector .at-btn-inspect-check.active {
+    background-color: rgba(37, 99, 235, 0.2);
+    border-color: #3b82f6;
+    color: #93c5fd;
+    box-shadow: 0 0 10px rgba(59, 130, 246, 0.32);
+}
+
+.at-footer-inspector .at-btn-inspect-check.active .at-icon-checked {
+    display: block;
+    color: #60a5fa;
+}
+
+.at-footer-inspector .at-btn-inspect-check.active .at-icon-unchecked {
+    display: none;
+}
