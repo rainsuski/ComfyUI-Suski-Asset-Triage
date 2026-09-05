@@ -44,15 +44,17 @@
 
 ---
 
-## 🔀 复杂工作流支持方案 (ComfyUI-DataflowProbe 对接)
+## 🔀 复杂工作流支持方案 (ComfyUI-Suski-Dataflow-Probe 对接)
+* **该方案仅影响复杂工作流的元数据显示，不影响正常使用。**  
+
 
 对于包含 **Base+Refiner 分步精修、动态 Switch 旁路分支、子图嵌套 (Group Node) 或动态 Wildcard 抽卡** 等复杂场景，原生的静态拓扑抓取往往无法获取运行时真实计算的动态参数。
 
-本插件已内置对 **[ComfyUI-DataflowProbe](https://github.com/Suski/ComfyUI-DataflowProbe)** 规范的原生双向对接：
+本插件已内置对 **[ComfyUI-Suski-Dataflow-Probe](https://github.com/rainsuski/ComfyUI-Suski-Dataflow-Probe)** 规范的原生双向对接：
 
 ```text
 [生成时]
-ComfyUI-DataflowProbe (探针与聚合) ──注入──> PNG extra_pnginfo (dataflow_lineage)
+ComfyUI-Suski-Dataflow-Probe (探针与聚合) ──注入──> PNG extra_pnginfo (dataflow_lineage)
                                                       │
                                                       ▼
 [审片时]
@@ -101,7 +103,7 @@ Asset Triage 解析调度器 ──优先命中──> 阶段一 / 阶段二 ...
 
 ```bash
 cd ComfyUI/custom_nodes/
-git clone https://github.com/Suski/ComfyUI-Suski-Asset-Triage.git
+git clone https://github.com/rainsuski/ComfyUI-Suski-Asset-Triage.git
 ```
 
 重启 ComfyUI 即可。
