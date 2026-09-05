@@ -10,6 +10,7 @@ import json
 import logging
 from pathlib import Path
 from typing import Any, Dict, Optional
+
 from PIL import Image
 
 from ..config import (
@@ -67,6 +68,11 @@ class ImageProcessor:
         thumb_path = CACHE_THUMBS_DIR / thumb_filename
         meta_path = CACHE_META_DIR / f"{asset_id}.json"
 
+        # 清理由于同名覆盖产生的旧哈希缩略图
+        for old_thumb in CACHE_THUMBS_DIR.glob(f"{asset_id}_*.webp"):
+            if old_thumb.name != thumb_filename:
+                old_thumb.unlink(missing_ok=True)
+
         width, height = 0, 0
         try:
             img_bytes.seek(0)
@@ -96,7 +102,8 @@ class ImageProcessor:
             logger.error(f"生成缩略图异常 [{asset_id}]: {e}")
             return None
 
-        # 提取结构化元数据并持久化物理绝对路径 (orig_path) 与大图访问路由
+        # 提取结构化元数据并持久化物理绝对路径 (orig_path) 与带版本戳的大图访问路由
+        file_mtime = file_path.stat().st_mtime
         metadata = MetadataParser.parse(img_bytes, file_path)
         metadata.update(
             {
@@ -107,9 +114,9 @@ class ImageProcessor:
                 "width": width,
                 "height": height,
                 "file_size": len(raw_bytes),
-                "created_at": file_path.stat().st_mtime,
+                "created_at": file_mtime,
                 "thumb_url": f"/asset_triage/thumb/{thumb_filename}",
-                "view_url": f"/asset_triage/view/{asset_id}",
+                "view_url": f"/asset_triage/view/{asset_id}?t={int(file_mtime * 1000)}",
             }
         )
 

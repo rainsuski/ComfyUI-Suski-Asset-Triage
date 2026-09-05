@@ -8,9 +8,11 @@
 import json
 import logging
 import mimetypes
+
 from aiohttp import web
 
 from server import PromptServer
+
 from ..config import CACHE_META_DIR, CACHE_THUMBS_DIR
 from .cleaner import AssetCleaner
 from .exporter import AssetExporter
@@ -55,24 +57,34 @@ class AssetTriageRoutes:
 
                     with open(meta_file, "r", encoding="utf-8") as f:
                         data = json.load(f)
-                        items.append(
-                            {
-                                "id": data.get("id", asset_id),
-                                "filename": data.get("filename"),
-                                "subfolder": data.get("subfolder"),
-                                "thumb_url": data.get("thumb_url"),
-                                "view_url": data.get(
-                                    "view_url", f"/asset_triage/view/{asset_id}"
-                                ),
-                                "width": data.get("width"),
-                                "height": data.get("height"),
-                                "created_at": data.get("created_at", 0),
-                                "model": data.get("model"),
-                                "seed": data.get("seed"),
-                                "cfg": data.get("cfg"),
-                                "steps": data.get("steps"),
-                            }
-                        )
+
+                    created_at = data.get("created_at", 0)
+                    base_view_url = data.get(
+                        "view_url", f"/asset_triage/view/{asset_id}"
+                    )
+                    t_param = f"?t={int(created_at * 1000)}" if created_at else ""
+                    view_url_with_t = (
+                        base_view_url
+                        if "?" in base_view_url
+                        else f"{base_view_url}{t_param}"
+                    )
+
+                    items.append(
+                        {
+                            "id": data.get("id", asset_id),
+                            "filename": data.get("filename"),
+                            "subfolder": data.get("subfolder"),
+                            "thumb_url": data.get("thumb_url"),
+                            "view_url": view_url_with_t,
+                            "width": data.get("width"),
+                            "height": data.get("height"),
+                            "created_at": created_at,
+                            "model": data.get("model"),
+                            "seed": data.get("seed"),
+                            "cfg": data.get("cfg"),
+                            "steps": data.get("steps"),
+                        }
+                    )
                 except Exception as e:
                     logger.warning(f"读取元数据条目异常 [{meta_file.name}]: {e}")
 
@@ -108,7 +120,7 @@ class AssetTriageRoutes:
     async def handle_get_image(request: web.Request) -> web.StreamResponse:
         """
         GET /asset_triage/view/{asset_id}
-        专有原图预览通道: 突破原生 /view 的目录限制，安全支持任意自定义暂存路径
+        专有原图预览通道: 严格禁用浏览器及中间层强缓存，杜绝覆写或同名临时文件显示陈旧大图
         """
         asset_id = request.match_info.get("asset_id", "")
         staging_file, _, _ = AssetCleaner._resolve_paths_by_id(asset_id)
@@ -123,7 +135,9 @@ class AssetTriageRoutes:
             staging_file,
             headers={
                 "Content-Type": content_type,
-                "Cache-Control": "no-cache",
+                "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+                "Pragma": "no-cache",
+                "Expires": "0",
             },
         )
 

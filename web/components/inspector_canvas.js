@@ -33,6 +33,7 @@ export class InspectorCanvas {
     this.naturalWidth = 0;
     this.naturalHeight = 0;
     this.resizeObserver = null;
+    this.currentLoadingId = null;
 
     this._bindEvents();
     this._initResizeObserver();
@@ -105,18 +106,30 @@ export class InspectorCanvas {
   }
 
   /**
-   * 加载大图并启动自适应居中呈现
+   * 加载大图并启动自适应居中呈现（消除图片复用竞态与缓存死锁）
    */
   loadImage(item) {
     if (!item) return;
 
-    // 优先使用突破目录限制的专用路由，降级使用原生 /view
-    const fullImageUrl = item.view_url || `/asset_triage/view/${encodeURIComponent(item.id)}`;
+    // 1. 构建严格携带版本时间戳的 URL，彻底击穿浏览器 Memory/Disk 缓存
+    const baseUrl = item.view_url || `/asset_triage/view/${encodeURIComponent(item.id)}`;
+    const cacheBuster = item.created_at
+      ? `t=${Math.floor(item.created_at * 1000)}`
+      : `t=${Date.now()}`;
+    const fullImageUrl = baseUrl.includes("?")
+      ? `${baseUrl}&${cacheBuster}`
+      : `${baseUrl}?${cacheBuster}`;
 
+    // 2. 立即隐去当前画布内容，防止上一次大图残影留存
     this.imgElement.style.opacity = "0";
-    this.imgElement.src = fullImageUrl;
+
+    // 3. 记录当前加载的唯一事务 ID，防止连续切图时异步回调乱序覆盖
+    this.currentLoadingId = item.id;
 
     const onReady = () => {
+      // 若下载期间用户已切换到其他图片，直接废弃过期回调
+      if (this.currentLoadingId !== item.id) return;
+
       this.naturalWidth = this.imgElement.naturalWidth || item.width || 1024;
       this.naturalHeight = this.imgElement.naturalHeight || item.height || 1024;
       this.imgElement.style.opacity = "1";
@@ -128,16 +141,21 @@ export class InspectorCanvas {
       this._preloadAdjacentImages();
     };
 
-    if (this.imgElement.complete && this.imgElement.naturalWidth > 0) {
-      onReady();
-    } else {
-      this.imgElement.onload = onReady;
-      this.imgElement.onerror = () => {
-        if (item.thumb_url && this.imgElement.src !== item.thumb_url) {
-          this.imgElement.src = item.thumb_url;
-        }
-      };
-    }
+    // 4. 清除上一张图的残留监听
+    this.imgElement.onload = null;
+    this.imgElement.onerror = null;
+
+    // 5. 挂载全新的加载与降级监听
+    this.imgElement.onload = onReady;
+    this.imgElement.onerror = () => {
+      if (this.currentLoadingId !== item.id) return;
+      if (item.thumb_url && this.imgElement.src !== item.thumb_url) {
+        this.imgElement.src = item.thumb_url;
+      }
+    };
+
+    // 6. 发起全新大图请求
+    this.imgElement.src = fullImageUrl;
   }
 
   fitToScreen() {
@@ -196,7 +214,14 @@ export class InspectorCanvas {
     [currentIndex - 1, currentIndex + 1].forEach((idx) => {
       if (idx >= 0 && idx < items.length) {
         const item = items[idx];
-        const preloadUrl = item.view_url || `/asset_triage/view/${encodeURIComponent(item.id)}`;
+        const baseUrl = item.view_url || `/asset_triage/view/${encodeURIComponent(item.id)}`;
+        const cacheBuster = item.created_at
+          ? `t=${Math.floor(item.created_at * 1000)}`
+          : `t=${Date.now()}`;
+        const preloadUrl = baseUrl.includes("?")
+          ? `${baseUrl}&${cacheBuster}`
+          : `${baseUrl}?${cacheBuster}`;
+
         const preloader = new Image();
         preloader.src = preloadUrl;
       }
