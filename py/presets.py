@@ -54,6 +54,9 @@ class PresetManager:
                         if "embed_lora" not in p:
                             p["embed_lora"] = True
                             migrated = True
+                        if "embed_lora_recipe" not in p:
+                            p["embed_lora_recipe"] = False
+                            migrated = True
                     if migrated:
                         cls.save_presets(presets)
                     return presets

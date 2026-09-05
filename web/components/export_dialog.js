@@ -25,6 +25,7 @@ export class ExportDialog {
     this.checkWorkflow = null;
     this.checkPrompt = null;
     this.checkLora = null;
+    this.checkLoraRecipe = null;
     this.countBadge = null;
 
     this._initDom();
@@ -125,6 +126,10 @@ export class ExportDialog {
                 <input type="checkbox" class="at-check-lora" checked />
                 <span>追加生效应挂载 LoRA 列表到文本</span>
               </label>
+              <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                <input type="checkbox" class="at-check-lora-recipe" />
+                <span>保存为 LoRA Manager 配方 (追加 Civitai / Hashes 扩展字段)</span>
+              </label>
             </div>
           </div>
 
@@ -162,6 +167,7 @@ export class ExportDialog {
     this.checkWorkflow = backdrop.querySelector(".at-check-workflow");
     this.checkPrompt = backdrop.querySelector(".at-check-prompt");
     this.checkLora = backdrop.querySelector(".at-check-lora");
+    this.checkLoraRecipe = backdrop.querySelector(".at-check-lora-recipe");
     this.countBadge = backdrop.querySelector(".at-export-count-badge");
 
     this._bindEvents();
@@ -290,6 +296,7 @@ export class ExportDialog {
     this.checkWorkflow.checked = preset.embed_workflow !== false;
     this.checkPrompt.checked = preset.embed_prompt !== false;
     this.checkLora.checked = preset.embed_lora !== false;
+    this.checkLoraRecipe.checked = preset.embed_lora_recipe === true;
 
     this.formatSelect.onchange();
   }
@@ -304,6 +311,7 @@ export class ExportDialog {
       embed_workflow: this.checkWorkflow.checked,
       embed_prompt: this.checkPrompt.checked,
       embed_lora: this.checkLora.checked,
+      embed_lora_recipe: this.checkLoraRecipe.checked,
     };
   }
 

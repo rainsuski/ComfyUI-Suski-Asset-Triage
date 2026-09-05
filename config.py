@@ -96,4 +96,5 @@ DEFAULT_PRESET = {
     "embed_workflow": True,
     "embed_prompt": True,
     "embed_lora": True,
+    "embed_lora_recipe": False,
 }

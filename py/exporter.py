@@ -5,6 +5,7 @@
           全格式画质控制 (PNG/WebP/JPEG)、元数据注入 (Workflow/A1111/LoRA/EXIF) 与防重名。
 """
 
+import hashlib
 import io
 import json
 import logging
@@ -28,6 +29,8 @@ _export_lock = threading.Lock()
 
 class AssetExporter:
     """资产转存核心引擎"""
+
+    _hash_cache: Dict[str, str] = {}
 
     @classmethod
     def export_assets(
@@ -94,6 +97,7 @@ class AssetExporter:
             embed_wf = preset.get("embed_workflow", True)
             embed_pm = preset.get("embed_prompt", True)
             embed_lr = preset.get("embed_lora", True)
+            embed_recipe = preset.get("embed_lora_recipe", False)
             quality = max(1, min(100, int(preset.get("quality", 95))))
 
             with open(temp_file, "rb") as f:
@@ -102,7 +106,10 @@ class AssetExporter:
             with Image.open(img_bytes) as img:
                 save_kwargs: Dict[str, Any] = {}
                 param_str = cls._build_parameter_string(
-                    meta, embed_lora=embed_lr, img_size=img.size
+                    meta,
+                    embed_lora=embed_lr,
+                    embed_recipe=embed_recipe,
+                    img_size=img.size,
                 )
 
                 if export_format in ("JPEG", "JPG"):
@@ -133,7 +140,7 @@ class AssetExporter:
                     if embed_pm and param_str:
                         pnginfo.add_text("parameters", param_str)
 
-                    # 对齐 ComfyUI 官方标准序列化 (使用标准 ASCII 转义，杜绝非 Latin-1 字符导致解析器 JSON.parse 崩溃)
+                    # 对齐 ComfyUI 官方标准序列化 (使用标准 ASCII 转义，杜绝非 Latin-1 字符导致解析器崩溃)
                     if embed_wf and "raw_workflow" in meta:
                         pnginfo.add_text(
                             "workflow",
@@ -270,10 +277,143 @@ class AssetExporter:
             counter += 1
 
     @classmethod
+    def _calculate_autov2_hash(cls, file_path: Path) -> str:
+        """计算 A1111/Civitai 规范的 10 位 AutoV2 大写 SHA256 哈希 (带内存缓存)"""
+        p_str = str(file_path.resolve())
+        if p_str in cls._hash_cache:
+            return cls._hash_cache[p_str]
+
+        try:
+            hasher = hashlib.sha256()
+            with open(file_path, "rb") as f:
+                for chunk in iter(lambda: f.read(1024 * 1024), b""):
+                    hasher.update(chunk)
+            h = hasher.hexdigest()[:10].upper()
+            cls._hash_cache[p_str] = h
+            return h
+        except Exception as e:
+            logger.warning(f"计算模型 Hash 异常 [{file_path}]: {e}")
+            return ""
+
+    @classmethod
+    def _find_model_file(cls, category: str, name: str) -> Optional[Path]:
+        """定位本地模型文件绝对路径"""
+        if not name or name == "Unknown":
+            return None
+
+        # 先通过原生接口精准解析
+        exact = folder_paths.get_full_path(category, name)
+        if exact and Path(exact).is_file():
+            return Path(exact)
+
+        # 遍历该分类已知路径做前缀或去扩展名匹配
+        clean_name = Path(name).stem.lower()
+        candidates = folder_paths.get_filename_list(category)
+        for c in candidates:
+            if Path(c).stem.lower() == clean_name:
+                resolved = folder_paths.get_full_path(category, c)
+                if resolved and Path(resolved).is_file():
+                    return Path(resolved)
+        return None
+
+    @classmethod
+    def _read_companion_metadata(cls, file_path: Optional[Path]) -> Dict[str, Any]:
+        """读取 LoRA Manager 本地伴随文件 (.metadata.json / .civitai.info / .json)"""
+        if not file_path or not file_path.is_file():
+            return {}
+
+        candidates = [
+            file_path.with_name(f"{file_path.stem}.metadata.json"),
+            file_path.with_name(f"{file_path.name}.metadata.json"),
+            file_path.with_name(f"{file_path.stem}.civitai.info"),
+            file_path.with_suffix(".json"),
+        ]
+
+        for p in candidates:
+            if p.is_file():
+                try:
+                    with open(p, "r", encoding="utf-8") as f:
+                        data = json.load(f)
+                        if isinstance(data, dict):
+                            return data
+                except Exception:
+                    pass
+        return {}
+
+    @classmethod
+    def _resolve_recipe_metadata(
+        cls, loras: List[Dict[str, Any]], model_name: str
+    ) -> Tuple[Dict[str, str], List[Dict[str, Any]]]:
+        """从本地磁盘定位模型及 LoRA Manager 伴随元数据，组装 Hashes 与 Civitai resources"""
+        hashes_dict: Dict[str, str] = {}
+        civitai_resources: List[Dict[str, Any]] = []
+
+        # 1. 尝试解析底模 Hash
+        model_file = cls._find_model_file(
+            "checkpoints", model_name
+        ) or cls._find_model_file("diffusion_models", model_name)
+        if model_file:
+            m_comp = cls._read_companion_metadata(model_file)
+            m_hash = ""
+            if m_comp and isinstance(m_comp.get("hashes"), dict):
+                m_hash = (
+                    m_comp["hashes"].get("AutoV2")
+                    or m_comp["hashes"].get("SHA256", "")[:10].upper()
+                )
+            if not m_hash:
+                m_hash = cls._calculate_autov2_hash(model_file)
+            if m_hash:
+                hashes_dict["model"] = m_hash
+
+        # 2. 依次解析各 LoRA
+        for lora in loras:
+            l_name = lora.get("name") or lora.get("lora_name") or ""
+            if not l_name or l_name == "Unknown":
+                continue
+
+            strength = lora.get("strength", 1.0)
+            lora_file = cls._find_model_file("loras", l_name)
+            companion_meta = (
+                cls._read_companion_metadata(lora_file) if lora_file else {}
+            )
+
+            # 计算或提取 Hash
+            l_hash = ""
+            if companion_meta:
+                h_obj = companion_meta.get("hashes", {})
+                if isinstance(h_obj, dict):
+                    l_hash = h_obj.get("AutoV2") or h_obj.get("SHA256", "")[:10].upper()
+            if not l_hash and lora_file:
+                l_hash = cls._calculate_autov2_hash(lora_file)
+
+            if l_hash:
+                hashes_dict[f"LORA:{Path(l_name).stem}"] = l_hash
+
+            # 组装 Civitai resources 项
+            res_item: Dict[str, Any] = {"weight": strength}
+            air = companion_meta.get("air", "")
+            if not air and companion_meta.get("modelId") and companion_meta.get("id"):
+                base_m = companion_meta.get("baseModel", "anima").lower()
+                air = f"urn:air:{base_m}:lora:civitai:{companion_meta['modelId']}@{companion_meta['id']}"
+
+            if air:
+                res_item["air"] = air
+            ver_name = companion_meta.get("versionName") or companion_meta.get("name")
+            if ver_name:
+                res_item["versionName"] = str(ver_name)
+            elif not air:
+                res_item["modelName"] = Path(l_name).stem
+
+            civitai_resources.append(res_item)
+
+        return hashes_dict, civitai_resources
+
+    @classmethod
     def _build_parameter_string(
         cls,
         meta: Dict[str, Any],
         embed_lora: bool = True,
+        embed_recipe: bool = False,
         img_size: Optional[Tuple[int, int]] = None,
     ) -> str:
         settings = PresetManager.get_settings()
@@ -342,7 +482,23 @@ class AssetExporter:
             param_parts.append(f"Size: {size_str}")
         if model and model != "Unknown":
             param_parts.append(f"Model: {model}")
-        param_parts.append("Version: ComfyUI")
+
+        # 5. 若开启了保存为 LoRA Manager 配方，解析并追加 Hashes 与 Civitai resources
+        if embed_recipe:
+            hashes_dict, civitai_resources = cls._resolve_recipe_metadata(loras, model)
+            if hashes_dict:
+                param_parts.append(
+                    f"Hashes: {json.dumps(hashes_dict, separators=(',', ':'))}"
+                )
+
+            param_parts.append("Version: ComfyUI")
+
+            if civitai_resources:
+                param_parts.append(
+                    f"Civitai resources: {json.dumps(civitai_resources, separators=(',', ':'))}"
+                )
+        else:
+            param_parts.append("Version: ComfyUI")
 
         param_line = ", ".join(param_parts)
         param_str = f"{pos}\nNegative prompt: {neg}\n{param_line}"
