@@ -34,30 +34,34 @@ for directory in (CACHE_THUMBS_DIR, CACHE_META_DIR):
 def get_staging_dir() -> Path:
     """
     动态获取审阅仓库暂存目录:
-    1. 若 settings.json 中的 staging_dir 为空，返回 ComfyUI 原生 temp 目录。
-    2. 若配置了自定义路径:
+    1. 默认读取 output/staging 目录。
+    2. 若 settings.json 中的 staging_dir 显式配置为空，则回退至 ComfyUI 原生 temp 目录。
+    3. 若配置了自定义路径:
        - 绝对路径: 直接返回并自动创建
        - 相对路径: 自动相对于 ComfyUI output 目录解析，方便原生 Save Image 节点直接匹配
     """
+    custom_staging = "staging"
     if CACHE_SETTINGS_FILE.is_file():
         try:
             with open(CACHE_SETTINGS_FILE, "r", encoding="utf-8") as f:
                 settings = json.load(f)
-                custom_staging = settings.get("staging_dir", "").strip()
-                if custom_staging:
-                    p = Path(custom_staging)
-                    if not p.is_absolute():
-                        resolved = (
-                            Path(folder_paths.get_output_directory()).resolve() / p
-                        ).resolve()
-                    else:
-                        resolved = p.resolve()
-                    resolved.mkdir(parents=True, exist_ok=True)
-                    return resolved
+                if "staging_dir" in settings:
+                    custom_staging = settings.get("staging_dir", "").strip()
         except Exception:
             pass
 
-    # 默认回退到 ComfyUI 运行时 temp 临时目录
+    if custom_staging:
+        p = Path(custom_staging)
+        if not p.is_absolute():
+            resolved = (
+                Path(folder_paths.get_output_directory()).resolve() / p
+            ).resolve()
+        else:
+            resolved = p.resolve()
+        resolved.mkdir(parents=True, exist_ok=True)
+        return resolved
+
+    # 显式为空时回退到 ComfyUI 运行时 temp 临时目录
     return Path(folder_paths.get_temp_directory()).resolve()
 
 

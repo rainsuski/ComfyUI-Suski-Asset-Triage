@@ -112,9 +112,12 @@ export class SettingsDialog {
     const s = store.settings || {};
     const q = (sel) => this.backdrop.querySelector(sel);
 
-    q(".at-set-staging-dir").value = s.staging_dir || "";
+    q(".at-set-staging-dir").value = s.staging_dir !== undefined ? s.staging_dir : "staging";
     q(".at-set-default-view").value = s.default_view || "masonry";
-    q(".at-set-thumb-size").value = String(s.thumb_max_edge || s.thumbnail_size || 512);
+
+    const rawThumb = s.thumb_max_edge !== undefined ? s.thumb_max_edge : (s.thumbnail_size !== undefined ? s.thumbnail_size : 512);
+    q(".at-set-thumb-size").value = String(rawThumb);
+
     q(".at-set-export-format").value = s.default_format || "PNG";
     q(".at-set-lineage-key").value = s.lineage_key || "dataflow_lineage";
     q(".at-set-lineage-stage").value = s.lineage_export_stage !== undefined ? s.lineage_export_stage : 0;
@@ -130,11 +133,14 @@ export class SettingsDialog {
   async _handleSave() {
     const q = (sel) => this.backdrop.querySelector(sel);
 
+    const thumbVal = q(".at-set-thumb-size").value;
+    const thumb_max_edge = thumbVal === "original" ? "original" : (parseInt(thumbVal, 10) || 512);
+
     const payload = {
       ...store.settings,
       staging_dir: q(".at-set-staging-dir").value.trim(),
       default_view: q(".at-set-default-view").value,
-      thumb_max_edge: parseInt(q(".at-set-thumb-size").value, 10) || 512,
+      thumb_max_edge: thumb_max_edge,
       default_format: q(".at-set-export-format").value,
       lineage_key: q(".at-set-lineage-key").value.trim() || "dataflow_lineage",
       lineage_export_stage: parseInt(q(".at-set-lineage-stage").value, 10) || 0,

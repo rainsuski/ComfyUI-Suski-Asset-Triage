@@ -20,6 +20,7 @@ from ..config import (
     DEFAULT_THUMB_QUALITY,
 )
 from .meta_parser import MetadataParser
+from .presets import PresetManager
 
 logger = logging.getLogger("AssetTriage.Processor")
 
@@ -88,10 +89,25 @@ class ImageProcessor:
                     else:
                         img_copy = img_copy.convert("RGB")
 
-                    img_copy.thumbnail(
-                        (DEFAULT_THUMB_MAX_EDGE, DEFAULT_THUMB_MAX_EDGE),
-                        Image.Resampling.LANCZOS,
+                    settings = PresetManager.get_settings()
+                    thumb_max_edge = settings.get(
+                        "thumb_max_edge", DEFAULT_THUMB_MAX_EDGE
                     )
+
+                    if thumb_max_edge != "original":
+                        try:
+                            edge_size = int(thumb_max_edge)
+                            if edge_size > 0:
+                                img_copy.thumbnail(
+                                    (edge_size, edge_size),
+                                    Image.Resampling.LANCZOS,
+                                )
+                        except (ValueError, TypeError):
+                            img_copy.thumbnail(
+                                (DEFAULT_THUMB_MAX_EDGE, DEFAULT_THUMB_MAX_EDGE),
+                                Image.Resampling.LANCZOS,
+                            )
+
                     thumb_io = io.BytesIO()
                     img_copy.save(
                         thumb_io, format="WEBP", quality=DEFAULT_THUMB_QUALITY, method=4

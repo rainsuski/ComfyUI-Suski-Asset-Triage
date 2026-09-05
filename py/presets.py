@@ -77,7 +77,7 @@ class PresetManager:
     def get_settings(cls) -> Dict[str, Any]:
         """获取视图首选项与全局设置"""
         default_settings = {
-            "staging_dir": "",  # 暂存仓库目录: 留空为原生 temp，填值则读取自定义目录
+            "staging_dir": "staging",  # 暂存仓库目录: 默认 staging，留空为原生 temp，填值则读取自定义目录
             "thumb_max_edge": DEFAULT_THUMB_MAX_EDGE,
             "default_view": "masonry",
             "auto_open_triage": False,
