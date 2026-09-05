@@ -1,7 +1,8 @@
 // web/components/metadata_sidebar.js
 /**
  * 项目代号: Asset Triage
- * 文件功能: 模式 B：参数属性侧边栏组件，渲染 Prompt/Negative、核心采样配置、LoRA 列表与一键复制。
+ * 文件功能: 模式 B：参数属性侧边栏组件：
+ *          渲染 Prompt/Negative、核心采样配置、常驻 LoRA 列表与一键复制。
  */
 
 import { TriageApi } from "../services/api.js";
@@ -76,7 +77,7 @@ export class MetadataSidebar {
         </div>
         <div class="at-meta-grid">
           <div class="at-meta-item" style="grid-column: 1 / -1;">
-            <span class="at-meta-item-label">模型 (Checkpoint)</span>
+            <span class="at-meta-item-label">模型 (Checkpoint / Net)</span>
             <span class="at-meta-item-val" title="${model}">${model}</span>
           </div>
           <div class="at-meta-item">
@@ -105,30 +106,34 @@ export class MetadataSidebar {
         </div>
       </section>
 
-      <!-- 挂载 LoRA 列表 -->
-      ${
-        loras.length > 0
-          ? `
-        <section class="at-meta-section">
-          <div class="at-meta-section-header">
-            <span>生效应 LoRA (${loras.length})</span>
-          </div>
+      <!-- 挂载 LoRA 列表 (常驻显示) -->
+      <section class="at-meta-section">
+        <div class="at-meta-section-header">
+          <span>挂载 LoRA (${loras.length})</span>
+          ${loras.length > 0 ? `<button class="at-copy-btn" data-copy="loras">📋 复制标签</button>` : ""}
+        </div>
+        ${loras.length > 0
+        ? `
           <div class="at-lora-pills">
             ${loras
-              .map(
-                (l) => `
+          .map(
+            (l) => `
               <div class="at-lora-pill" title="${l.name}">
-                <span>${l.name}</span>
-                <b style="color: #60a5fa;">${l.strength}</b>
+                <span>${this._escapeHtml(l.name)}</span>
+                <b style="color: #60a5fa; margin-left: 4px;">${l.strength}</b>
               </div>
             `
-              )
-              .join("")}
+          )
+          .join("")}
           </div>
-        </section>
-      `
-          : ""
+        `
+        : `
+          <div class="at-meta-text" style="color: var(--at-text-muted); font-size: 12px; font-style: italic;">
+            (无挂载 LoRA)
+          </div>
+        `
       }
+      </section>
 
       <!-- 文件元信息 -->
       <section class="at-meta-section">
@@ -148,16 +153,15 @@ export class MetadataSidebar {
       </section>
     `;
 
-    this._bindCopyEvents(pos, neg, seed);
+    this._bindCopyEvents(pos, neg, seed, loras);
   }
 
-  _bindCopyEvents(pos, neg, seed) {
+  _bindCopyEvents(pos, neg, seed, loras) {
     const copyToClipboard = async (text, btn) => {
       try {
         if (navigator.clipboard && window.isSecureContext) {
           await navigator.clipboard.writeText(text);
         } else {
-          // 兼容非安全环境/降级处理
           const textArea = document.createElement("textarea");
           textArea.value = text;
           textArea.style.position = "fixed";
@@ -194,6 +198,13 @@ export class MetadataSidebar {
 
     this.container.querySelector('[data-copy="seed"]')?.addEventListener("click", (e) => {
       copyToClipboard(String(seed), e.target);
+    });
+
+    this.container.querySelector('[data-copy="loras"]')?.addEventListener("click", (e) => {
+      const loraTagString = loras
+        .map((l) => `<lora:${l.name}:${l.strength}>`)
+        .join(", ");
+      copyToClipboard(loraTagString, e.target);
     });
   }
 

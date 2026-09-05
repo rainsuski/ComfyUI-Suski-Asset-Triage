@@ -14,18 +14,15 @@ export class InspectorCanvas {
 
     this.imgElement = document.createElement("img");
     this.imgElement.className = "at-canvas-image";
-    // 强制消除 Tailwind / 全局 CSS 的 max-width 干扰
     this.imgElement.style.maxWidth = "none";
     this.imgElement.style.maxHeight = "none";
 
-    // 悬浮 HUD 状态
     this.hudElement = document.createElement("div");
     this.hudElement.className = "at-canvas-hud";
 
     this.container.appendChild(this.imgElement);
     this.container.appendChild(this.hudElement);
 
-    // 变换状态量
     this.scale = 1;
     this.translateX = 0;
     this.translateY = 0;
@@ -55,7 +52,6 @@ export class InspectorCanvas {
   }
 
   _bindEvents() {
-    // 鼠标拖拽平移
     this.container.addEventListener("mousedown", (e) => {
       if (e.button !== 0) return;
       this.isDragging = true;
@@ -78,7 +74,6 @@ export class InspectorCanvas {
       }
     });
 
-    // 鼠标为中心等比滚轮缩放
     this.container.addEventListener(
       "wheel",
       (e) => {
@@ -100,7 +95,6 @@ export class InspectorCanvas {
       { passive: false }
     );
 
-    // 双击切换
     this.container.addEventListener("dblclick", () => {
       if (Math.abs(this.scale - 1) < 0.05) {
         this.fitToScreen();
@@ -116,7 +110,8 @@ export class InspectorCanvas {
   loadImage(item) {
     if (!item) return;
 
-    const fullImageUrl = `/view?filename=${encodeURIComponent(item.filename)}&subfolder=${encodeURIComponent(item.subfolder || "")}&type=temp`;
+    // 优先使用突破目录限制的专用路由，降级使用原生 /view
+    const fullImageUrl = item.view_url || `/asset_triage/view/${encodeURIComponent(item.id)}`;
 
     this.imgElement.style.opacity = "0";
     this.imgElement.src = fullImageUrl;
@@ -126,7 +121,6 @@ export class InspectorCanvas {
       this.naturalHeight = this.imgElement.naturalHeight || item.height || 1024;
       this.imgElement.style.opacity = "1";
 
-      // 延时至 DOM 容器回流完成后执行居中适应
       requestAnimationFrame(() => {
         this.fitToScreen();
       });
@@ -139,7 +133,6 @@ export class InspectorCanvas {
     } else {
       this.imgElement.onload = onReady;
       this.imgElement.onerror = () => {
-        // 大图读取异常时降级尝试缩略图
         if (item.thumb_url && this.imgElement.src !== item.thumb_url) {
           this.imgElement.src = item.thumb_url;
         }
@@ -203,7 +196,7 @@ export class InspectorCanvas {
     [currentIndex - 1, currentIndex + 1].forEach((idx) => {
       if (idx >= 0 && idx < items.length) {
         const item = items[idx];
-        const preloadUrl = `/view?filename=${encodeURIComponent(item.filename)}&subfolder=${encodeURIComponent(item.subfolder || "")}&type=temp`;
+        const preloadUrl = item.view_url || `/asset_triage/view/${encodeURIComponent(item.id)}`;
         const preloader = new Image();
         preloader.src = preloadUrl;
       }

@@ -2,31 +2,39 @@
 /**
  * 项目代号: Asset Triage
  * 文件功能: 全局设置与首选项弹窗组件：
- *          落实原型 2.1 与 2.2 规范（启动视图、缩略图画质、Token 转存默认格式与误删保护）。
+ *          落实原型规范（审阅暂存仓库目录、启动视图、缩略图画质、转存格式与防误删）。
  */
 
 import { store } from "../services/store.js";
 import { TriageApi } from "../services/api.js";
 
 export class SettingsDialog {
-    constructor(options = {}) {
-        this.options = options;
-        this.backdrop = null;
-        this._initDom();
-    }
+  constructor(options = {}) {
+    this.options = options;
+    this.backdrop = null;
+    this._initDom();
+  }
 
-    _initDom() {
-        const backdrop = document.createElement("div");
-        backdrop.className = "at-dialog-backdrop at-hidden";
+  _initDom() {
+    const backdrop = document.createElement("div");
+    backdrop.className = "at-dialog-backdrop at-hidden";
 
-        backdrop.innerHTML = `
+    backdrop.innerHTML = `
       <div class="at-dialog-container at-settings-dialog-container">
         <div class="at-dialog-header">
-          <span class="at-dialog-title">⚙ 全局偏好与转存配置</span>
+          <span class="at-dialog-title">⚙ 全局偏好与审阅仓库配置</span>
           <button class="at-icon-btn at-btn-close-settings">✕</button>
         </div>
 
         <div class="at-dialog-body">
+          <div class="at-form-item">
+            <label class="at-form-label">审阅仓库暂存目录 (Staging Directory)</label>
+            <input type="text" class="at-input at-set-staging-dir" placeholder="留空使用默认 temp (如: staging 或绝对路径 D:/AI/Review)" style="width: 100%; box-sizing: border-box;" />
+            <span style="font-size: 11px; color: #888; margin-top: 4px; display: block; line-height: 1.4;">
+              💡 留空时读取 ComfyUI 临时预览图 (temp)；若指定目录，可配合原生 <b>Save Image</b> 节点保存至该目录即可直接进入待审列表，实现持久化审片。
+            </span>
+          </div>
+
           <div class="at-form-item">
             <label class="at-form-label">默认启动视图</label>
             <select class="at-select at-set-default-view" style="width: 100%;">
@@ -68,61 +76,63 @@ export class SettingsDialog {
       </div>
     `;
 
-        backdrop.addEventListener("click", (e) => {
-            if (e.target === backdrop) this.close();
-        });
+    backdrop.addEventListener("click", (e) => {
+      if (e.target === backdrop) this.close();
+    });
 
-        this.backdrop = backdrop;
+    this.backdrop = backdrop;
 
-        backdrop.querySelector(".at-btn-close-settings").onclick = () => this.close();
-        backdrop.querySelector(".at-btn-cancel-settings").onclick = () => this.close();
+    backdrop.querySelector(".at-btn-close-settings").onclick = () => this.close();
+    backdrop.querySelector(".at-btn-cancel-settings").onclick = () => this.close();
 
-        backdrop.querySelector(".at-btn-save-settings").onclick = async () => {
-            await this._handleSave();
-        };
+    backdrop.querySelector(".at-btn-save-settings").onclick = async () => {
+      await this._handleSave();
+    };
 
-        document.body.appendChild(backdrop);
+    document.body.appendChild(backdrop);
+  }
+
+  open() {
+    const s = store.settings || {};
+    const q = (sel) => this.backdrop.querySelector(sel);
+
+    q(".at-set-staging-dir").value = s.staging_dir || "";
+    q(".at-set-default-view").value = s.default_view || "masonry";
+    q(".at-set-thumb-size").value = String(s.thumbnail_size || 512);
+    q(".at-set-export-format").value = s.default_format || "PNG";
+    q(".at-set-confirm-delete").checked = s.confirm_delete !== false;
+
+    this.backdrop.classList.remove("at-hidden");
+  }
+
+  close() {
+    this.backdrop.classList.add("at-hidden");
+  }
+
+  async _handleSave() {
+    const q = (sel) => this.backdrop.querySelector(sel);
+
+    const payload = {
+      ...store.settings,
+      staging_dir: q(".at-set-staging-dir").value.trim(),
+      default_view: q(".at-set-default-view").value,
+      thumbnail_size: parseInt(q(".at-set-thumb-size").value, 10) || 512,
+      default_format: q(".at-set-export-format").value,
+      confirm_delete: q(".at-set-confirm-delete").checked
+    };
+
+    try {
+      if (TriageApi.updateSettings) {
+        await TriageApi.updateSettings(payload);
+      } else if (TriageApi.saveSettings) {
+        await TriageApi.saveSettings(payload);
+      }
+      store.settings = payload;
+      this.close();
+      if (this.options.onSaved) this.options.onSaved();
+    } catch (err) {
+      console.error("[AssetTriage] 保存设置失败:", err);
+      alert("保存设置失败，请查看控制台日志。");
     }
-
-    open() {
-        const s = store.settings || {};
-        const q = (sel) => this.backdrop.querySelector(sel);
-
-        q(".at-set-default-view").value = s.default_view || "masonry";
-        q(".at-set-thumb-size").value = String(s.thumbnail_size || 512);
-        q(".at-set-export-format").value = s.default_format || "PNG";
-        q(".at-set-confirm-delete").checked = s.confirm_delete !== false;
-
-        this.backdrop.classList.remove("at-hidden");
-    }
-
-    close() {
-        this.backdrop.classList.add("at-hidden");
-    }
-
-    async _handleSave() {
-        const q = (sel) => this.backdrop.querySelector(sel);
-
-        const payload = {
-            ...store.settings,
-            default_view: q(".at-set-default-view").value,
-            thumbnail_size: parseInt(q(".at-set-thumb-size").value, 10) || 512,
-            default_format: q(".at-set-export-format").value,
-            confirm_delete: q(".at-set-confirm-delete").checked
-        };
-
-        try {
-            if (TriageApi.updateSettings) {
-                await TriageApi.updateSettings(payload);
-            } else if (TriageApi.saveSettings) {
-                await TriageApi.saveSettings(payload);
-            }
-            store.settings = payload;
-            this.close();
-            if (this.options.onSaved) this.options.onSaved();
-        } catch (err) {
-            console.error("[AssetTriage] 保存设置失败:", err);
-            alert("保存设置失败，请查看控制台日志。");
-        }
-    }
+  }
 }

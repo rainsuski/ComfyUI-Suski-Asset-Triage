@@ -1,7 +1,7 @@
 # py/processor.py
 """
 项目代号: Asset Triage
-文件功能: 异步任务工作线程，生成轻量 WebP 缩略图并写入缓存，持久化原图物理绝对路径。
+文件功能: 异步任务工作线程，生成轻量 WebP 缩略图并写入缓存，持久化原图物理绝对路径与专用视图路由。
 """
 
 import hashlib
@@ -96,12 +96,12 @@ class ImageProcessor:
             logger.error(f"生成缩略图异常 [{asset_id}]: {e}")
             return None
 
-        # 提取结构化元数据并持久化物理绝对路径 (orig_path)
+        # 提取结构化元数据并持久化物理绝对路径 (orig_path) 与大图访问路由
         metadata = MetadataParser.parse(img_bytes, file_path)
         metadata.update(
             {
                 "id": asset_id,
-                "orig_path": actual_resolved_path,  # 核心：记录落盘物理绝对路径
+                "orig_path": actual_resolved_path,
                 "filename": actual_filename,
                 "subfolder": subfolder,
                 "width": width,
@@ -109,6 +109,7 @@ class ImageProcessor:
                 "file_size": len(raw_bytes),
                 "created_at": file_path.stat().st_mtime,
                 "thumb_url": f"/asset_triage/thumb/{thumb_filename}",
+                "view_url": f"/asset_triage/view/{asset_id}",
             }
         )
 
@@ -123,6 +124,7 @@ class ImageProcessor:
             "filename": metadata["filename"],
             "subfolder": metadata["subfolder"],
             "thumb_url": metadata["thumb_url"],
+            "view_url": metadata["view_url"],
             "width": width,
             "height": height,
             "created_at": metadata["created_at"],

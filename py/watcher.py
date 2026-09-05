@@ -2,7 +2,8 @@
 """
 项目代号: Asset Triage
 文件功能: Hook PromptServer.send_sync 消息总线，
-          捕获执行完成事件，无阻塞派发预处理任务并通过 WebSocket 广播。
+          智能匹配原生 Preview (temp) 与原生 Save Image (自定义暂存目录)，
+          无阻塞派发预处理任务并通过 WebSocket 广播。
 """
 
 from concurrent.futures import ThreadPoolExecutor
@@ -12,7 +13,7 @@ from typing import Any, Dict
 import folder_paths
 
 from server import PromptServer
-from ..config import WS_EVENT_ITEM_ADDED
+from ..config import WS_EVENT_ITEM_ADDED, get_staging_dir, is_custom_staging_enabled
 from .processor import ImageProcessor
 
 logger = logging.getLogger("AssetTriage.Watcher")
@@ -51,7 +52,7 @@ class ComfyEventWatcher:
 
     @classmethod
     def _handle_executed_event(cls, data: Dict[str, Any]) -> None:
-        """解析 executed 数据包并实时获取最新临时目录"""
+        """解析 executed 数据包并根据暂存仓库策略分流处理"""
         output_data = data.get("output", {})
         if not isinstance(output_data, dict):
             return
@@ -60,7 +61,10 @@ class ComfyEventWatcher:
         if not isinstance(images, list):
             return
 
-        # 动态获取运行时真实 temp 根目录，彻底避免导入时静态变量失效
+        staging_dir = get_staging_dir()
+        custom_enabled = is_custom_staging_enabled()
+
+        current_output_dir = Path(folder_paths.get_output_directory()).resolve()
         current_temp_dir = Path(folder_paths.get_temp_directory()).resolve()
 
         for img_info in images:
@@ -68,18 +72,40 @@ class ComfyEventWatcher:
                 continue
 
             img_type = img_info.get("type", "")
-            if img_type != "temp":
-                continue
-
             filename = img_info.get("filename", "")
             subfolder = img_info.get("subfolder", "")
             if not filename:
                 continue
 
-            file_path = (current_temp_dir / subfolder / filename).resolve()
-            _executor.submit(
-                cls._async_process_and_broadcast, file_path, subfolder, filename
-            )
+            # 分支 1: 用户启用了自定义暂存目录 -> 捕获保存到该目录下的 output 图片
+            if custom_enabled:
+                if img_type == "output":
+                    file_path = (current_output_dir / subfolder / filename).resolve()
+                    try:
+                        # 检查落盘文件是否处于用户配置的暂存目录树中
+                        if file_path.is_file() and file_path.is_relative_to(
+                            staging_dir
+                        ):
+                            rel_parent = file_path.relative_to(staging_dir).parent
+                            norm_subfolder = (
+                                str(rel_parent) if rel_parent != Path(".") else ""
+                            )
+                            _executor.submit(
+                                cls._async_process_and_broadcast,
+                                file_path,
+                                norm_subfolder,
+                                filename,
+                            )
+                    except Exception as e:
+                        logger.warning(f"核验自定义暂存文件路径异常 [{file_path}]: {e}")
+
+            # 分支 2: 默认模式 (留空) -> 仅捕获原生 temp 预览图片
+            else:
+                if img_type == "temp":
+                    file_path = (current_temp_dir / subfolder / filename).resolve()
+                    _executor.submit(
+                        cls._async_process_and_broadcast, file_path, subfolder, filename
+                    )
 
     @staticmethod
     def _async_process_and_broadcast(

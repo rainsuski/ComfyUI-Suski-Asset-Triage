@@ -4,6 +4,7 @@
 文件功能: 全局配置、跨平台路径管理与常量定义
 """
 
+import json
 from pathlib import Path
 import folder_paths
 
@@ -26,15 +27,56 @@ CACHE_SETTINGS_FILE = CACHE_ROOT / "settings.json"
 for directory in (CACHE_THUMBS_DIR, CACHE_META_DIR):
     directory.mkdir(parents=True, exist_ok=True)
 
+
 # ---------------------------------------------------------
-# 2. 默认缩略图与画质规范
+# 2. 审阅暂存仓库目录动态解析引擎
+# ---------------------------------------------------------
+def get_staging_dir() -> Path:
+    """
+    动态获取审阅仓库暂存目录:
+    1. 若 settings.json 中的 staging_dir 为空，返回 ComfyUI 原生 temp 目录。
+    2. 若配置了自定义路径:
+       - 绝对路径: 直接返回并自动创建
+       - 相对路径: 自动相对于 ComfyUI output 目录解析，方便原生 Save Image 节点直接匹配
+    """
+    if CACHE_SETTINGS_FILE.is_file():
+        try:
+            with open(CACHE_SETTINGS_FILE, "r", encoding="utf-8") as f:
+                settings = json.load(f)
+                custom_staging = settings.get("staging_dir", "").strip()
+                if custom_staging:
+                    p = Path(custom_staging)
+                    if not p.is_absolute():
+                        resolved = (
+                            Path(folder_paths.get_output_directory()).resolve() / p
+                        ).resolve()
+                    else:
+                        resolved = p.resolve()
+                    resolved.mkdir(parents=True, exist_ok=True)
+                    return resolved
+        except Exception:
+            pass
+
+    # 默认回退到 ComfyUI 运行时 temp 临时目录
+    return Path(folder_paths.get_temp_directory()).resolve()
+
+
+def is_custom_staging_enabled() -> bool:
+    """判断当前是否启用了自定义暂存目录"""
+    current_staging = get_staging_dir()
+    default_temp = Path(folder_paths.get_temp_directory()).resolve()
+    return current_staging != default_temp
+
+
+# ---------------------------------------------------------
+# 3. 默认缩略图与画质规范
 # ---------------------------------------------------------
 DEFAULT_THUMB_MAX_EDGE = 512
 DEFAULT_THUMB_QUALITY = 80
 DEFAULT_THUMB_FORMAT = "WEBP"
 
 # ---------------------------------------------------------
-# 3. 预设与系统常量
+# 4. 预设与系统常量
 # ---------------------------------------------------------
 PLUGIN_NAME = "Asset-Triage"
 WS_EVENT_ITEM_ADDED = "asset_triage_item_added"

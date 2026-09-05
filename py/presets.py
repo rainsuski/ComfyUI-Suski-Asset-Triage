@@ -34,7 +34,6 @@ class PresetManager:
                 if isinstance(presets, list) and len(presets) > 0:
                     migrated = False
                     for p in presets:
-                        # 自动升级旧版分开的 path_template / name_template 为单合一 template
                         if "template" not in p:
                             path_part = p.get(
                                 "path_template", "%date%/%category%"
@@ -78,6 +77,7 @@ class PresetManager:
     def get_settings(cls) -> Dict[str, Any]:
         """获取视图首选项与全局设置"""
         default_settings = {
+            "staging_dir": "",  # 暂存仓库目录: 留空为原生 temp，填值则读取自定义目录
             "thumb_max_edge": DEFAULT_THUMB_MAX_EDGE,
             "default_view": "masonry",
             "auto_open_triage": False,

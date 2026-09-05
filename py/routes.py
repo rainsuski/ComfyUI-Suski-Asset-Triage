@@ -2,11 +2,12 @@
 """
 项目代号: Asset Triage
 文件功能: 注册 PromptServer 的 aiohttp RESTful API 路由，
-          提供缩略图服务、待审队列实时存活核验 (即时 GC)、转存/删除调度及设置读写。
+          提供原图/缩略图流媒体服务、待审队列实时存活核验 (即时 GC)、转存/删除调度及设置读写。
 """
 
 import json
 import logging
+import mimetypes
 from aiohttp import web
 
 from server import PromptServer
@@ -28,6 +29,7 @@ class AssetTriageRoutes:
 
         app.router.add_get("/asset_triage/items", cls.handle_get_items)
         app.router.add_get("/asset_triage/thumb/{filename}", cls.handle_get_thumb)
+        app.router.add_get("/asset_triage/view/{asset_id}", cls.handle_get_image)
         app.router.add_get("/asset_triage/meta/{asset_id}", cls.handle_get_meta)
         app.router.add_post("/asset_triage/export", cls.handle_export)
         app.router.add_post("/asset_triage/delete", cls.handle_delete)
@@ -40,15 +42,14 @@ class AssetTriageRoutes:
 
     @staticmethod
     async def handle_get_items(request: web.Request) -> web.Response:
-        """GET /asset_triage/items (含磁盘物理存活核验，剔除 ComfyUI 重启产生的幽灵图片)"""
+        """GET /asset_triage/items (含磁盘物理存活核验，剔除外部清理造成的幽灵图片)"""
         items = []
         try:
             for meta_file in list(CACHE_META_DIR.glob("*.json")):
                 asset_id = meta_file.stem
                 try:
-                    # 关键：核查 temp 原图物理存活性，若已物理丢失则立即销毁孤儿缓存
-                    temp_file, _, _ = AssetCleaner._resolve_paths_by_id(asset_id)
-                    if not temp_file.is_file():
+                    staging_file, _, _ = AssetCleaner._resolve_paths_by_id(asset_id)
+                    if not staging_file.is_file():
                         AssetCleaner.delete_single(asset_id)
                         continue
 
@@ -60,6 +61,9 @@ class AssetTriageRoutes:
                                 "filename": data.get("filename"),
                                 "subfolder": data.get("subfolder"),
                                 "thumb_url": data.get("thumb_url"),
+                                "view_url": data.get(
+                                    "view_url", f"/asset_triage/view/{asset_id}"
+                                ),
                                 "width": data.get("width"),
                                 "height": data.get("height"),
                                 "created_at": data.get("created_at", 0),
@@ -99,6 +103,29 @@ class AssetTriageRoutes:
         except Exception as e:
             logger.error(f"响应缩略图失败 [{filename}]: {e}")
             return web.Response(status=500, text="Internal Server Error")
+
+    @staticmethod
+    async def handle_get_image(request: web.Request) -> web.StreamResponse:
+        """
+        GET /asset_triage/view/{asset_id}
+        专有原图预览通道: 突破原生 /view 的目录限制，安全支持任意自定义暂存路径
+        """
+        asset_id = request.match_info.get("asset_id", "")
+        staging_file, _, _ = AssetCleaner._resolve_paths_by_id(asset_id)
+
+        if not staging_file.is_file():
+            return web.Response(status=404, text="Image Not Found")
+
+        content_type, _ = mimetypes.guess_type(str(staging_file))
+        content_type = content_type or "image/png"
+
+        return web.FileResponse(
+            staging_file,
+            headers={
+                "Content-Type": content_type,
+                "Cache-Control": "no-cache",
+            },
+        )
 
     @staticmethod
     async def handle_get_meta(request: web.Request) -> web.Response:
