@@ -101,7 +101,7 @@ Asset Triage 解析调度器 ──优先命中──> 阶段一 / 阶段二 ...
 
 ```bash
 cd ComfyUI/custom_nodes/
-git clone https://github.com/Suski/ComfyUI-Suski-Asset-Triage.git
+git clone https://github.com/rainsuski/ComfyUI-Suski-Asset-Triage.git
 ```
 
 重启 ComfyUI 即可。
