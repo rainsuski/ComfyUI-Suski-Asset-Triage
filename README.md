@@ -45,6 +45,8 @@
 ---
 
 ## 🔀 复杂工作流支持方案 (ComfyUI-Suski-Dataflow-Probe 对接)
+* **该方案仅影响复杂工作流的元数据显示，不影响正常使用。**  
+
 
 对于包含 **Base+Refiner 分步精修、动态 Switch 旁路分支、子图嵌套 (Group Node) 或动态 Wildcard 抽卡** 等复杂场景，原生的静态拓扑抓取往往无法获取运行时真实计算的动态参数。
 
