@@ -12,7 +12,7 @@ import re
 import threading
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from PIL import Image, PngImagePlugin
 
@@ -101,7 +101,9 @@ class AssetExporter:
 
             with Image.open(img_bytes) as img:
                 save_kwargs: Dict[str, Any] = {}
-                param_str = cls._build_parameter_string(meta, embed_lora=embed_lr)
+                param_str = cls._build_parameter_string(
+                    meta, embed_lora=embed_lr, img_size=img.size
+                )
 
                 if export_format in ("JPEG", "JPG"):
                     if img.mode != "RGB":
@@ -127,17 +129,22 @@ class AssetExporter:
                     save_kwargs["compress_level"] = compress_level
 
                     pnginfo = PngImagePlugin.PngInfo()
-                    if embed_pm and "raw_prompt" in meta:
-                        pnginfo.add_text(
-                            "prompt", json.dumps(meta["raw_prompt"], ensure_ascii=False)
-                        )
+                    # 优先写入标准 parameters 块，保证各类解析工具第一顺位命中
+                    if embed_pm and param_str:
+                        pnginfo.add_text("parameters", param_str)
+
+                    # 对齐 ComfyUI 官方标准序列化 (使用标准 ASCII 转义，杜绝非 Latin-1 字符导致解析器 JSON.parse 崩溃)
                     if embed_wf and "raw_workflow" in meta:
                         pnginfo.add_text(
                             "workflow",
-                            json.dumps(meta["raw_workflow"], ensure_ascii=False),
+                            json.dumps(meta["raw_workflow"]),
                         )
-                    if embed_pm and param_str:
-                        pnginfo.add_text("parameters", param_str)
+
+                    if embed_pm and "raw_prompt" in meta:
+                        pnginfo.add_text(
+                            "prompt",
+                            json.dumps(meta["raw_prompt"]),
+                        )
 
                     # 若存在 DataflowProbe 血统元数据，转存时继承写入 PNG 文本块
                     if meta.get("raw_lineage"):
@@ -145,7 +152,7 @@ class AssetExporter:
                         lineage_key = settings.get("lineage_key", "dataflow_lineage")
                         pnginfo.add_text(
                             lineage_key,
-                            json.dumps(meta["raw_lineage"], ensure_ascii=False),
+                            json.dumps(meta["raw_lineage"]),
                         )
 
                     save_kwargs["pnginfo"] = pnginfo
@@ -264,7 +271,10 @@ class AssetExporter:
 
     @classmethod
     def _build_parameter_string(
-        cls, meta: Dict[str, Any], embed_lora: bool = True
+        cls,
+        meta: Dict[str, Any],
+        embed_lora: bool = True,
+        img_size: Optional[Tuple[int, int]] = None,
     ) -> str:
         settings = PresetManager.get_settings()
         stage_idx = int(settings.get("lineage_export_stage", 0))
@@ -275,23 +285,67 @@ class AssetExporter:
             else (stages[0] if stages else {})
         )
 
-        pos = target_stage.get("positive_prompt", meta.get("positive_prompt", ""))
-        neg = target_stage.get("negative_prompt", meta.get("negative_prompt", ""))
+        pos = str(
+            target_stage.get("positive_prompt", meta.get("positive_prompt", ""))
+        ).strip()
+        neg = str(
+            target_stage.get("negative_prompt", meta.get("negative_prompt", ""))
+        ).strip()
         steps = target_stage.get("steps", meta.get("steps", 0))
-        sampler = target_stage.get("sampler_name", meta.get("sampler_name", "Unknown"))
+        sampler = str(
+            target_stage.get("sampler_name", meta.get("sampler_name", "Unknown"))
+        ).strip()
+        scheduler = str(
+            target_stage.get("scheduler", meta.get("scheduler", ""))
+        ).strip()
         cfg = target_stage.get("cfg", meta.get("cfg", 0.0))
         seed = target_stage.get("seed", meta.get("seed", 0))
-        model = target_stage.get("model", meta.get("model", "Unknown"))
+        model = str(target_stage.get("model", meta.get("model", "Unknown"))).strip()
         loras = target_stage.get("loras", meta.get("loras", []))
 
-        param_str = f"{pos}\nNegative prompt: {neg}\nSteps: {steps}, Sampler: {sampler}, CFG scale: {cfg}, Seed: {seed}, Model: {model}"
-
+        # 1. 规范化 LoRA 标签：追加在正向提示词末尾（A1111 规范）
         if embed_lora and loras:
-            lora_strs = [
-                f"<lora:{l.get('name', 'lora')}:{l.get('strength', 1.0)}>"
-                for l in loras
-            ]
-            param_str += f", LoRA: {', '.join(lora_strs)}"
+            lora_tags = []
+            for l in loras:
+                l_name = l.get("name", "lora")
+                l_str = l.get("strength", 1.0)
+                tag = f"<lora:{l_name}:{l_str}>"
+                if f"<lora:{l_name}:" not in pos:
+                    lora_tags.append(tag)
+            if lora_tags:
+                lora_block = "\n".join(lora_tags)
+                pos = f"{pos}\n{lora_block}" if pos else lora_block
+
+        # 2. 规范化 Sampler + Scheduler 组合表示
+        if scheduler and scheduler.lower() not in ("unknown", "none"):
+            sampler_display = f"{sampler} {scheduler}".strip()
+        else:
+            sampler_display = sampler
+
+        # 3. 规范化分辨率 Size 字段
+        width, height = 0, 0
+        if img_size and len(img_size) == 2:
+            width, height = img_size
+        else:
+            width = meta.get("width", 0)
+            height = meta.get("height", 0)
+        size_str = f"{width}x{height}" if width and height else ""
+
+        # 4. 构建标准 A1111 风格的逗号分隔键值对参数行
+        param_parts = [
+            f"Steps: {steps}",
+            f"Sampler: {sampler_display}",
+            f"CFG scale: {cfg}",
+            f"Seed: {seed}",
+        ]
+        if size_str:
+            param_parts.append(f"Size: {size_str}")
+        if model and model != "Unknown":
+            param_parts.append(f"Model: {model}")
+        param_parts.append("Version: ComfyUI")
+
+        param_line = ", ".join(param_parts)
+        param_str = f"{pos}\nNegative prompt: {neg}\n{param_line}"
 
         return param_str
 
