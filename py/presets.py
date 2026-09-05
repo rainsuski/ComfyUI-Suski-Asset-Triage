@@ -82,6 +82,8 @@ class PresetManager:
             "default_view": "masonry",
             "auto_open_triage": False,
             "confirm_delete": True,
+            "lineage_key": "dataflow_lineage",  # DataflowProbe 元数据注入键名
+            "lineage_export_stage": 0,  # 导出占位符默认取用的阶段序号 (0-based)
         }
 
         if not CACHE_SETTINGS_FILE.exists():

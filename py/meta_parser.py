@@ -1,236 +1,154 @@
 # py/meta_parser.py
 """
 项目代号: Asset Triage
-文件功能: 解析 PNG 文本块 (tEXt/iTXt) 中的 prompt 与 workflow，
-          仅提供针对标准原生工作流的基础静态拓扑抓取。
+文件功能: 通用图片元数据解析调度器与统一抽象接口：
+          支持模块化引擎扩展，优先探测血统探针 (DataflowProbe) 多阶段元数据，
+          未命中时平滑降级至原生工作流基础静态拓扑抓取。
 """
 
 import io
 import json
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, Optional, Tuple
 from PIL import Image
+
+from .lineage_parser import DataflowLineageParser, NativeWorkflowParser
+from .presets import PresetManager
 
 logger = logging.getLogger("AssetTriage.MetaParser")
 
 
+class BaseMetaParser:
+    """元数据解析器统一抽象基类"""
+
+    @classmethod
+    def can_parse(
+        cls,
+        raw_info: Dict[str, Any],
+        prompt_graph: Dict[str, Any],
+        workflow: Dict[str, Any],
+        settings: Optional[Dict[str, Any]] = None,
+    ) -> bool:
+        """检查当前解析引擎是否能够解析该数据"""
+        raise NotImplementedError
+
+    @classmethod
+    def parse(
+        cls,
+        raw_info: Dict[str, Any],
+        prompt_graph: Dict[str, Any],
+        workflow: Dict[str, Any],
+        settings: Optional[Dict[str, Any]] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """执行具体元数据提取逻辑"""
+        raise NotImplementedError
+
+
 class MetadataParser:
-    """标准原生工作流基础静态元数据解析器"""
+    """通用元数据解析调度器门面"""
+
+    @staticmethod
+    def read_all_metadata_from_bytes(
+        image_bytes: io.BytesIO,
+    ) -> Tuple[Dict[str, Any], Dict[str, Any], Dict[str, Any]]:
+        """从内存字节流中读取原始 info 文本字典、prompt 图结构与 workflow"""
+        raw_info: Dict[str, Any] = {}
+        prompt_graph: Dict[str, Any] = {}
+        workflow: Dict[str, Any] = {}
+
+        try:
+            image_bytes.seek(0)
+            with Image.open(image_bytes) as img:
+                raw_info = dict(img.info or {})
+
+                if "prompt" in raw_info:
+                    p_data = raw_info["prompt"]
+                    prompt_graph = (
+                        json.loads(p_data) if isinstance(p_data, str) else p_data
+                    )
+                if "workflow" in raw_info:
+                    wf_data = raw_info["workflow"]
+                    workflow = (
+                        json.loads(wf_data) if isinstance(wf_data, str) else wf_data
+                    )
+        except Exception as e:
+            logger.warning(f"读取图片元数据块失败: {e}")
+
+        return (
+            raw_info,
+            prompt_graph if isinstance(prompt_graph, dict) else {},
+            workflow if isinstance(workflow, dict) else {},
+        )
 
     @staticmethod
     def read_png_metadata_from_bytes(
         image_bytes: io.BytesIO,
     ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
-        """从内存字节流中安全读取 PNG prompt 与 workflow 文本块"""
-        prompt_graph = {}
-        workflow = {}
+        """保持向后兼容的原生签名接口"""
+        _, prompt_graph, workflow = MetadataParser.read_all_metadata_from_bytes(
+            image_bytes
+        )
+        return prompt_graph, workflow
+
+    @classmethod
+    def parse(
+        cls,
+        image_bytes: io.BytesIO,
+        file_path: Path,
+        settings: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        """统一解析调度主入口"""
+        if settings is None:
+            settings = PresetManager.get_settings()
+
+        raw_info, prompt_graph, workflow = cls.read_all_metadata_from_bytes(image_bytes)
+
+        parsed_result: Optional[Dict[str, Any]] = None
+
+        # 1. 优先策略：检测并解析 DataflowProbe 注入的动态元数据
         try:
-            image_bytes.seek(0)
-            with Image.open(image_bytes) as img:
-                info = img.info or {}
-                if "prompt" in info:
-                    p_data = info["prompt"]
-                    prompt_graph = (
-                        json.loads(p_data) if isinstance(p_data, str) else p_data
-                    )
-                if "workflow" in info:
-                    wf_data = info["workflow"]
-                    workflow = (
-                        json.loads(wf_data) if isinstance(wf_data, str) else wf_data
+            if DataflowLineageParser.can_parse(raw_info, settings=settings):
+                parsed_result = DataflowLineageParser.parse(raw_info, settings=settings)
+                if parsed_result:
+                    logger.debug(
+                        f"成功匹配并解析 DataflowProbe 元数据: {file_path.name}"
                     )
         except Exception as e:
-            logger.warning(f"读取 PNG 元数据块失败: {e}")
-        return (
-            prompt_graph if isinstance(prompt_graph, dict) else {},
-            workflow if isinstance(workflow, dict) else {},
-        )
+            logger.warning(f"DataflowProbe 解析引擎处理异常，自动平滑降级: {e}")
+            parsed_result = None
 
-    @classmethod
-    def parse(cls, image_bytes: io.BytesIO, file_path: Path) -> Dict[str, Any]:
-        """基础静态解析主入口"""
-        prompt_graph, workflow = cls.read_png_metadata_from_bytes(image_bytes)
+        # 2. 降级策略：标准原生工作流静态拓扑回溯
+        if not parsed_result:
+            parsed_result = NativeWorkflowParser.parse(prompt_graph)
 
-        parsed: Dict[str, Any] = {
-            "model": "Unknown",
-            "seed": -1,
-            "steps": 0,
-            "cfg": 0.0,
-            "sampler_name": "Unknown",
-            "scheduler": "Unknown",
-            "positive_prompt": "",
-            "negative_prompt": "",
-            "loras": [],
+        # 3. 标准化封装与顶层向下兼容映射
+        stages = parsed_result.get("stages", [])
+        export_stage_idx = int(settings.get("lineage_export_stage", 0))
+        target_idx = export_stage_idx if 0 <= export_stage_idx < len(stages) else 0
+        active_stage = stages[target_idx] if stages else {}
+
+        final_meta: Dict[str, Any] = {
+            # 基础兼容顶层字段 (供老旧卡片视图与快捷读取直接使用)
+            "model": active_stage.get("model", "Unknown"),
+            "seed": active_stage.get("seed", -1),
+            "steps": active_stage.get("steps", 0),
+            "cfg": active_stage.get("cfg", 0.0),
+            "sampler_name": active_stage.get("sampler_name", "Unknown"),
+            "scheduler": active_stage.get("scheduler", "Unknown"),
+            "positive_prompt": active_stage.get("positive_prompt", ""),
+            "negative_prompt": active_stage.get("negative_prompt", ""),
+            "loras": active_stage.get("loras", []),
+            # 多阶段时序扩展字段
+            "has_lineage": parsed_result.get("has_lineage", False),
+            "schema_version": parsed_result.get("schema_version", "1.0"),
+            "stage_count": len(stages),
+            "stages": stages,
+            "custom": parsed_result.get("custom", {}),
+            # 原生图结构保留
             "raw_prompt": prompt_graph,
             "raw_workflow": workflow,
+            "raw_lineage": parsed_result.get("raw_lineage"),
         }
 
-        if not prompt_graph:
-            return parsed
-
-        # 1. 查找核心 KSampler 节点
-        sampler_node = cls._find_standard_sampler(prompt_graph)
-        if not sampler_node:
-            return parsed
-
-        inputs = sampler_node.get("inputs", {})
-
-        # 2. 静态提取基础数值
-        parsed["seed"] = int(inputs.get("seed", inputs.get("noise_seed", -1)))
-        parsed["steps"] = int(inputs.get("steps", 0))
-        parsed["cfg"] = round(float(inputs.get("cfg", 0.0)), 2)
-        parsed["sampler_name"] = str(inputs.get("sampler_name", "Unknown")).strip()
-        parsed["scheduler"] = str(inputs.get("scheduler", "Unknown")).strip()
-
-        # 3. 静态追溯正/负向提示词
-        parsed["positive_prompt"] = cls._trace_text(
-            prompt_graph, inputs.get("positive"), visited=set()
-        )
-        parsed["negative_prompt"] = cls._trace_text(
-            prompt_graph, inputs.get("negative"), visited=set()
-        )
-
-        # 4. 静态追溯主模型与沿途 LoRA
-        parsed["model"] = cls._trace_model_name(
-            prompt_graph, inputs.get("model"), visited=set()
-        )
-        parsed["loras"] = cls._trace_loras(
-            prompt_graph, inputs.get("model"), visited=set()
-        )
-
-        return parsed
-
-    # ---------------------------------------------------------
-    # 基础节点查找与静态回溯引擎
-    # ---------------------------------------------------------
-    @staticmethod
-    def _find_standard_sampler(graph: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        """寻找标准 KSampler 节点"""
-        standard_types = ("KSampler", "KSamplerAdvanced", "SamplerCustom")
-        for node in graph.values():
-            if isinstance(node, dict) and node.get("class_type") in standard_types:
-                return node
-
-        # 基础兜底：任一具备 seed, steps, cfg 的采样节点
-        for node in graph.values():
-            if isinstance(node, dict):
-                inputs = node.get("inputs", {})
-                if (
-                    isinstance(inputs, dict)
-                    and "seed" in inputs
-                    and "steps" in inputs
-                    and "cfg" in inputs
-                ):
-                    return node
-        return None
-
-    @classmethod
-    def _trace_text(cls, graph: Dict[str, Any], link: Any, visited: Set[str]) -> str:
-        """沿 conditioning 连线追溯标准 CLIPTextEncode 文本"""
-        if not link or not isinstance(link, list) or len(link) < 1:
-            return ""
-
-        node_id = str(link[0])
-        if node_id in visited:
-            return ""
-        visited.add(node_id)
-
-        node = graph.get(node_id)
-        if not isinstance(node, dict):
-            return ""
-
-        class_type = str(node.get("class_type", ""))
-        inputs = node.get("inputs", {})
-        if not isinstance(inputs, dict):
-            return ""
-
-        # 标准文本编码器
-        if "CLIPTextEncode" in class_type:
-            # 兼容 SDXL 原生双输入 (text_g / text_l)
-            if "text_g" in inputs or "text_l" in inputs:
-                tg = str(inputs.get("text_g", "")).strip()
-                tl = str(inputs.get("text_l", "")).strip()
-                if tg and tl and tg != tl:
-                    return f"{tg}, {tl}"
-                return tg or tl
-            return str(inputs.get("text", "")).strip()
-
-        # 处理 Conditioning 级联/组合节点
-        for forward_key in ("conditioning", "conditioning_1", "conditioning_2", "clip"):
-            if forward_key in inputs and isinstance(inputs[forward_key], list):
-                res = cls._trace_text(graph, inputs[forward_key], visited)
-                if res:
-                    return res
-
-        return ""
-
-    @classmethod
-    def _trace_model_name(
-        cls, graph: Dict[str, Any], link: Any, visited: Set[str]
-    ) -> str:
-        """沿 model 连线追溯模型加载器名称"""
-        if not link or not isinstance(link, list) or len(link) < 1:
-            return "Unknown"
-
-        node_id = str(link[0])
-        if node_id in visited:
-            return "Unknown"
-        visited.add(node_id)
-
-        node = graph.get(node_id)
-        if not isinstance(node, dict):
-            return "Unknown"
-
-        class_type = str(node.get("class_type", ""))
-        inputs = node.get("inputs", {})
-        if not isinstance(inputs, dict):
-            return "Unknown"
-
-        # Checkpoint 加载器
-        if "CheckpointLoader" in class_type or "ckpt_name" in inputs:
-            ckpt = inputs.get("ckpt_name", "Unknown")
-            return Path(str(ckpt)).stem
-
-        # UNET / Diffusion Model 加载器
-        if "UNETLoader" in class_type or "unet_name" in inputs:
-            unet = inputs.get("unet_name", "Unknown")
-            return f"[Net] {Path(str(unet)).stem}"
-
-        # 向上穿透
-        if "model" in inputs and isinstance(inputs["model"], list):
-            return cls._trace_model_name(graph, inputs["model"], visited)
-
-        return "Unknown"
-
-    @classmethod
-    def _trace_loras(
-        cls, graph: Dict[str, Any], link: Any, visited: Set[str]
-    ) -> List[Dict[str, Any]]:
-        """沿 model 连线向上抓取挂载的标准 LoRA"""
-        loras = []
-        curr_link = link
-
-        while curr_link and isinstance(curr_link, list) and len(curr_link) >= 1:
-            node_id = str(curr_link[0])
-            if node_id in visited:
-                break
-            visited.add(node_id)
-
-            node = graph.get(node_id)
-            if not isinstance(node, dict):
-                break
-
-            class_type = str(node.get("class_type", ""))
-            inputs = node.get("inputs", {})
-            if not isinstance(inputs, dict):
-                break
-
-            if "LoraLoader" in class_type:
-                lora_name = Path(str(inputs.get("lora_name", "Unknown"))).stem
-                strength = float(inputs.get("strength_model", 1.0))
-                if lora_name and lora_name != "None":
-                    loras.append({"name": lora_name, "strength": strength})
-
-            curr_link = inputs.get("model")
-
-        return loras
+        return final_meta

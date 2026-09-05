@@ -19,6 +19,7 @@ from PIL import Image, PngImagePlugin
 import folder_paths
 
 from .cleaner import AssetCleaner
+from .presets import PresetManager
 
 logger = logging.getLogger("AssetTriage.Exporter")
 
@@ -137,6 +138,16 @@ class AssetExporter:
                         )
                     if embed_pm and param_str:
                         pnginfo.add_text("parameters", param_str)
+
+                    # 若存在 DataflowProbe 血统元数据，转存时继承写入 PNG 文本块
+                    if meta.get("raw_lineage"):
+                        settings = PresetManager.get_settings()
+                        lineage_key = settings.get("lineage_key", "dataflow_lineage")
+                        pnginfo.add_text(
+                            lineage_key,
+                            json.dumps(meta["raw_lineage"], ensure_ascii=False),
+                        )
+
                     save_kwargs["pnginfo"] = pnginfo
 
                 img.save(target_path, **save_kwargs)
@@ -157,21 +168,36 @@ class AssetExporter:
     def _resolve_path_and_stem(
         cls, template: str, meta: Dict[str, Any]
     ) -> Tuple[Path, str]:
-        """解析带 Token 与切片的模板字符串"""
+        """解析带 Token 与切片的模板字符串，优先取用配置指定的 Stage 阶段参数"""
         now = datetime.now()
 
-        raw_model = str(meta.get("model", "Unknown"))
+        # 根据配置项提取指定阶段，默认 stage 0
+        settings = PresetManager.get_settings()
+        stage_idx = int(settings.get("lineage_export_stage", 0))
+        stages = meta.get("stages", [])
+        target_stage = (
+            stages[stage_idx]
+            if stages and 0 <= stage_idx < len(stages)
+            else (stages[0] if stages else {})
+        )
+
+        raw_model = str(target_stage.get("model", meta.get("model", "Unknown")))
         model_name = Path(raw_model).stem
 
         token_map = {
             "date": now.strftime("%Y-%m-%d"),
             "time": now.strftime("%H%M%S"),
             "model": model_name,
-            "sampler": str(meta.get("sampler_name", "Unknown")),
-            "scheduler": str(meta.get("scheduler", "Unknown")),
-            "seed": str(meta.get("seed", 0)),
-            "cfg": str(meta.get("cfg", 0.0)),
-            "steps": str(meta.get("steps", 0)),
+            "sampler": str(
+                target_stage.get("sampler_name", meta.get("sampler_name", "Unknown"))
+            ),
+            "scheduler": str(
+                target_stage.get("scheduler", meta.get("scheduler", "Unknown"))
+            ),
+            "seed": str(target_stage.get("seed", meta.get("seed", 0))),
+            "cfg": str(target_stage.get("cfg", meta.get("cfg", 0.0))),
+            "steps": str(target_stage.get("steps", meta.get("steps", 0))),
+            "stage": str(target_stage.get("stage_name", f"Stage_{stage_idx + 1}")),
         }
 
         def replace_token(match: re.Match) -> str:
@@ -240,20 +266,30 @@ class AssetExporter:
     def _build_parameter_string(
         cls, meta: Dict[str, Any], embed_lora: bool = True
     ) -> str:
-        pos = meta.get("positive_prompt", "")
-        neg = meta.get("negative_prompt", "")
-        steps = meta.get("steps", 0)
-        sampler = meta.get("sampler_name", "Unknown")
-        cfg = meta.get("cfg", 0.0)
-        seed = meta.get("seed", 0)
-        model = meta.get("model", "Unknown")
+        settings = PresetManager.get_settings()
+        stage_idx = int(settings.get("lineage_export_stage", 0))
+        stages = meta.get("stages", [])
+        target_stage = (
+            stages[stage_idx]
+            if stages and 0 <= stage_idx < len(stages)
+            else (stages[0] if stages else {})
+        )
+
+        pos = target_stage.get("positive_prompt", meta.get("positive_prompt", ""))
+        neg = target_stage.get("negative_prompt", meta.get("negative_prompt", ""))
+        steps = target_stage.get("steps", meta.get("steps", 0))
+        sampler = target_stage.get("sampler_name", meta.get("sampler_name", "Unknown"))
+        cfg = target_stage.get("cfg", meta.get("cfg", 0.0))
+        seed = target_stage.get("seed", meta.get("seed", 0))
+        model = target_stage.get("model", meta.get("model", "Unknown"))
+        loras = target_stage.get("loras", meta.get("loras", []))
 
         param_str = f"{pos}\nNegative prompt: {neg}\nSteps: {steps}, Sampler: {sampler}, CFG scale: {cfg}, Seed: {seed}, Model: {model}"
 
-        if embed_lora and meta.get("loras"):
+        if embed_lora and loras:
             lora_strs = [
                 f"<lora:{l.get('name', 'lora')}:{l.get('strength', 1.0)}>"
-                for l in meta["loras"]
+                for l in loras
             ]
             param_str += f", LoRA: {', '.join(lora_strs)}"
 

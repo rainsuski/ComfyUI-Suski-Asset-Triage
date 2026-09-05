@@ -2,7 +2,7 @@
 /**
  * 项目代号: Asset Triage
  * 文件功能: 模式 B：参数属性侧边栏组件：
- *          渲染 Prompt/Negative、核心采样配置、常驻 LoRA 列表与一键复制。
+ *          支持多阶段血统指示器切换，渲染核心采样配置、挂载 LoRA 列表、Prompt/Negative 与文件属性。
  */
 
 import { TriageApi } from "../services/api.js";
@@ -11,6 +11,8 @@ export class MetadataSidebar {
   constructor() {
     this.container = document.createElement("aside");
     this.container.className = "at-sidebar-wrapper";
+    this.currentData = null;
+    this.currentStageIndex = 0;
   }
 
   /**
@@ -25,52 +27,83 @@ export class MetadataSidebar {
 
     // 骨架屏加载态
     this.container.innerHTML = `
-      <div style="color: var(--at-text-muted); font-size: 13px; text-align: center; padding-top: 20px;">
+      <div style="color: var(--at-text-muted); font-size: 12px; text-align: center; padding-top: 24px;">
         正在读取缓存元数据...
       </div>
     `;
 
     // 优先拉取后端 meta 缓存中的详细生成参数
     const meta = await TriageApi.getMetadata(item.id);
-    const data = meta || item;
+    this.currentData = meta || item;
+    this.currentStageIndex = 0;
 
-    this._renderDetails(data);
+    this._render();
   }
 
-  _renderDetails(data) {
-    const pos = data.positive_prompt || "(无提示词内容)";
-    const neg = data.negative_prompt || "(无反向提示词)";
-    const model = data.model || "Unknown";
-    const sampler = data.sampler_name || "Unknown";
-    const scheduler = data.scheduler || "Unknown";
-    const cfg = data.cfg !== undefined ? data.cfg : "-";
-    const steps = data.steps !== undefined ? data.steps : "-";
-    const seed = data.seed !== undefined ? data.seed : "-";
-    const loras = Array.isArray(data.loras) ? data.loras : [];
+  _render() {
+    const data = this.currentData;
+    if (!data) return;
+
+    const stages = Array.isArray(data.stages) && data.stages.length > 0 ? data.stages : null;
+    const hasMultipleStages = stages && stages.length > 1;
+    const activeStage = stages ? (stages[this.currentStageIndex] || stages[0]) : data;
+
+    const pos = activeStage.positive_prompt || "(无提示词内容)";
+    const neg = activeStage.negative_prompt || "(无反向提示词)";
+    const model = activeStage.model || "Unknown";
+    const sampler = activeStage.sampler_name || "Unknown";
+    const scheduler = activeStage.scheduler || "Unknown";
+    const cfg = activeStage.cfg !== undefined ? activeStage.cfg : "-";
+    const steps = activeStage.steps !== undefined ? activeStage.steps : "-";
+    const seed = activeStage.seed !== undefined ? activeStage.seed : "-";
+    const loras = Array.isArray(activeStage.loras) ? activeStage.loras : [];
+
+    // 文件全局属性
     const width = data.width || "-";
     const height = data.height || "-";
     const fileSize = data.file_size ? `${(data.file_size / (1024 * 1024)).toFixed(2)} MB` : "-";
 
+    // 1. 顶部现代几何阶段指示器
+    let indicatorHtml = "";
+    if (hasMultipleStages) {
+      const isFirst = this.currentStageIndex === 0;
+      const isLast = this.currentStageIndex === stages.length - 1;
+      const dotsHtml = stages
+        .map((st, idx) => {
+          const isActive = idx === this.currentStageIndex;
+          return `<button class="at-stage-pill ${isActive ? "active" : ""}" data-stage-idx="${idx}" title="${this._escapeHtml(st.stage_name || `Stage ${idx + 1}`)}"></button>`;
+        })
+        .join("");
+
+      indicatorHtml = `
+        <div class="at-stage-indicator-section">
+          <div class="at-stage-nav-row">
+            <button class="at-stage-arrow-btn at-stage-prev-btn" ${isFirst ? "disabled" : ""} title="上一阶段">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="15 18 9 12 15 6"></polyline>
+              </svg>
+            </button>
+            <div class="at-stage-pills-track">${dotsHtml}</div>
+            <button class="at-stage-arrow-btn at-stage-next-btn" ${isLast ? "disabled" : ""} title="下一阶段">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="9 18 15 12 9 6"></polyline>
+              </svg>
+            </button>
+          </div>
+          <div class="at-stage-caption" key="${this.currentStageIndex}">
+            <span class="at-stage-name-text" title="${this._escapeHtml(activeStage.stage_name || `Stage ${this.currentStageIndex + 1}`)}">
+              ${this._escapeHtml(activeStage.stage_name || `Stage ${this.currentStageIndex + 1}`)}
+            </span>
+            <span class="at-stage-counter">#${this.currentStageIndex + 1}/${stages.length}</span>
+          </div>
+        </div>
+      `;
+    }
+
     this.container.innerHTML = `
-      <!-- 正向提示词 -->
-      <section class="at-meta-section">
-        <div class="at-meta-section-header">
-          <span>提示词 (Prompt)</span>
-          <button class="at-copy-btn" data-copy="pos">📋 复制</button>
-        </div>
-        <div class="at-meta-text">${this._escapeHtml(pos)}</div>
-      </section>
+      ${indicatorHtml}
 
-      <!-- 反向提示词 -->
-      <section class="at-meta-section">
-        <div class="at-meta-section-header">
-          <span>反向 (Negative)</span>
-          <button class="at-copy-btn" data-copy="neg">📋 复制</button>
-        </div>
-        <div class="at-meta-text">${this._escapeHtml(neg)}</div>
-      </section>
-
-      <!-- 核心生成参数 -->
+      <!-- 1. 核心采样配置 (最高优先级) -->
       <section class="at-meta-section">
         <div class="at-meta-section-header">
           <span>核心采样配置</span>
@@ -106,7 +139,7 @@ export class MetadataSidebar {
         </div>
       </section>
 
-      <!-- 挂载 LoRA 列表 (常驻显示) -->
+      <!-- 2. 挂载 LoRA 列表 -->
       <section class="at-meta-section">
         <div class="at-meta-section-header">
           <span>挂载 LoRA (${loras.length})</span>
@@ -118,9 +151,9 @@ export class MetadataSidebar {
             ${loras
           .map(
             (l) => `
-              <div class="at-lora-pill" title="${l.name}">
-                <span>${this._escapeHtml(l.name)}</span>
-                <b style="color: #60a5fa; margin-left: 4px;">${l.strength}</b>
+              <div class="at-lora-pill" title="${this._escapeHtml(l.name)}">
+                <span class="at-lora-pill-name">${this._escapeHtml(l.name)}</span>
+                <span class="at-lora-pill-val">${l.strength}</span>
               </div>
             `
           )
@@ -128,14 +161,32 @@ export class MetadataSidebar {
           </div>
         `
         : `
-          <div class="at-meta-text" style="color: var(--at-text-muted); font-size: 12px; font-style: italic;">
+          <div class="at-meta-text-empty">
             (无挂载 LoRA)
           </div>
         `
       }
       </section>
 
-      <!-- 文件元信息 -->
+      <!-- 3. 提示词 (Prompt) -->
+      <section class="at-meta-section">
+        <div class="at-meta-section-header">
+          <span>提示词 (Prompt)</span>
+          <button class="at-copy-btn" data-copy="pos">📋 复制</button>
+        </div>
+        <div class="at-meta-text at-thin-scrollbar">${this._escapeHtml(pos)}</div>
+      </section>
+
+      <!-- 4. 反向 (Negative) -->
+      <section class="at-meta-section">
+        <div class="at-meta-section-header">
+          <span>反向 (Negative)</span>
+          <button class="at-copy-btn" data-copy="neg">📋 复制</button>
+        </div>
+        <div class="at-meta-text at-thin-scrollbar">${this._escapeHtml(neg)}</div>
+      </section>
+
+      <!-- 5. 文件属性 -->
       <section class="at-meta-section">
         <div class="at-meta-section-header">
           <span>文件属性</span>
@@ -153,10 +204,36 @@ export class MetadataSidebar {
       </section>
     `;
 
-    this._bindCopyEvents(pos, neg, seed, loras);
+    this._bindEvents(pos, neg, seed, loras, stages);
   }
 
-  _bindCopyEvents(pos, neg, seed, loras) {
+  _bindEvents(pos, neg, seed, loras, stages) {
+    // 药丸指示器点击
+    this.container.querySelectorAll(".at-stage-pill").forEach((pill) => {
+      pill.addEventListener("click", () => {
+        const idx = parseInt(pill.getAttribute("data-stage-idx"), 10);
+        if (!isNaN(idx) && idx !== this.currentStageIndex) {
+          this.currentStageIndex = idx;
+          this._render();
+        }
+      });
+    });
+
+    // 阶段上一页 / 下一页箭头
+    this.container.querySelector(".at-stage-prev-btn")?.addEventListener("click", () => {
+      if (this.currentStageIndex > 0) {
+        this.currentStageIndex--;
+        this._render();
+      }
+    });
+
+    this.container.querySelector(".at-stage-next-btn")?.addEventListener("click", () => {
+      if (stages && this.currentStageIndex < stages.length - 1) {
+        this.currentStageIndex++;
+        this._render();
+      }
+    });
+
     const copyToClipboard = async (text, btn) => {
       try {
         if (navigator.clipboard && window.isSecureContext) {

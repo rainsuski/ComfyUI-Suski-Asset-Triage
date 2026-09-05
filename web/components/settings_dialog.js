@@ -62,6 +62,22 @@ export class SettingsDialog {
           </div>
 
           <div class="at-form-item">
+            <label class="at-form-label">DataflowProbe 血统探针注入键名 (Lineage Key)</label>
+            <input type="text" class="at-input at-set-lineage-key" placeholder="默认为 dataflow_lineage" style="width: 100%; box-sizing: border-box;" />
+            <span style="font-size: 11px; color: #888; margin-top: 4px; display: block; line-height: 1.4;">
+              💡 对应 ComfyUI-DataflowProbe 写入 extra_pnginfo 的元数据键名，检测到时优先采用多阶段时序动态元数据。
+            </span>
+          </div>
+
+          <div class="at-form-item">
+            <label class="at-form-label">转存命名默认采样阶段 (Lineage Stage Index)</label>
+            <input type="number" min="0" max="99" class="at-input at-set-lineage-stage" placeholder="0" style="width: 100%; box-sizing: border-box;" />
+            <span style="font-size: 11px; color: #888; margin-top: 4px; display: block; line-height: 1.4;">
+              💡 当图片包含多阶段元数据时，转存命名占位符（如 %model%、%seed%、%steps%）默认提取的阶段索引（0 代表 Stage 1）。
+            </span>
+          </div>
+
+          <div class="at-form-item">
             <label class="at-form-label" style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
               <input type="checkbox" class="at-set-confirm-delete" style="cursor: pointer;" />
               <span>废弃资产时弹出二次确认对话框</span>
@@ -98,8 +114,10 @@ export class SettingsDialog {
 
     q(".at-set-staging-dir").value = s.staging_dir || "";
     q(".at-set-default-view").value = s.default_view || "masonry";
-    q(".at-set-thumb-size").value = String(s.thumbnail_size || 512);
+    q(".at-set-thumb-size").value = String(s.thumb_max_edge || s.thumbnail_size || 512);
     q(".at-set-export-format").value = s.default_format || "PNG";
+    q(".at-set-lineage-key").value = s.lineage_key || "dataflow_lineage";
+    q(".at-set-lineage-stage").value = s.lineage_export_stage !== undefined ? s.lineage_export_stage : 0;
     q(".at-set-confirm-delete").checked = s.confirm_delete !== false;
 
     this.backdrop.classList.remove("at-hidden");
@@ -116,9 +134,11 @@ export class SettingsDialog {
       ...store.settings,
       staging_dir: q(".at-set-staging-dir").value.trim(),
       default_view: q(".at-set-default-view").value,
-      thumbnail_size: parseInt(q(".at-set-thumb-size").value, 10) || 512,
+      thumb_max_edge: parseInt(q(".at-set-thumb-size").value, 10) || 512,
       default_format: q(".at-set-export-format").value,
-      confirm_delete: q(".at-set-confirm-delete").checked
+      lineage_key: q(".at-set-lineage-key").value.trim() || "dataflow_lineage",
+      lineage_export_stage: parseInt(q(".at-set-lineage-stage").value, 10) || 0,
+      confirm_delete: q(".at-set-confirm-delete").checked,
     };
 
     try {

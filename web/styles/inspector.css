@@ -90,28 +90,160 @@
  * 3. 结构化参数右侧栏 (Metadata Sidebar)
  * --------------------------------------------------------- */
 .at-sidebar-wrapper {
-    width: 380px;
-    min-width: 380px;
+    width: 350px;
+    min-width: 350px;
     height: 100%;
-    background-color: #121318;
-    border-left: 1px solid rgba(255, 255, 255, 0.08);
+    background-color: #0b0c10;
+    border-left: 1px solid rgba(255, 255, 255, 0.1);
     display: flex;
     flex-direction: column;
     overflow-y: auto;
     box-sizing: border-box;
-    padding: 18px;
-    gap: 14px;
+    padding: 10px 12px;
+    gap: 8px;
     z-index: 4;
 }
 
+/* 顶端现代几何流线阶段指示器 */
+.at-stage-indicator-section {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    padding: 6px 10px;
+    background-color: #14161f;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 7px;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+}
+
+.at-stage-nav-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+}
+
+.at-stage-arrow-btn {
+    width: 20px;
+    height: 20px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: none;
+    color: #71717a;
+    cursor: pointer;
+    padding: 0;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.at-stage-arrow-btn svg {
+    pointer-events: none;
+    transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.at-stage-arrow-btn:hover:not(:disabled) {
+    color: #93c5fd;
+    background-color: rgba(255, 255, 255, 0.07);
+}
+
+.at-stage-prev-btn:hover:not(:disabled) svg {
+    transform: translateX(-1.5px);
+}
+
+.at-stage-next-btn:hover:not(:disabled) svg {
+    transform: translateX(1.5px);
+}
+
+.at-stage-arrow-btn:disabled {
+    opacity: 0.18;
+    cursor: not-allowed;
+}
+
+/* 现代药丸弹性拉伸动效 (Pill Morphing) */
+.at-stage-pills-track {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 2px 4px;
+}
+
+.at-stage-pill {
+    width: 6px;
+    height: 6px;
+    border-radius: 3px;
+    background-color: rgba(255, 255, 255, 0.22);
+    border: none;
+    cursor: pointer;
+    padding: 0;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.at-stage-pill:hover:not(.active) {
+    background-color: rgba(255, 255, 255, 0.45);
+    transform: scale(1.2);
+}
+
+.at-stage-pill.active {
+    width: 16px;
+    background-color: #3b82f6;
+    box-shadow: 0 0 8px rgba(59, 130, 246, 0.6);
+}
+
+/* 阶段名称淡入微动效 */
+.at-stage-caption {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    animation: at-fade-slide 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes at-fade-slide {
+    from {
+        opacity: 0;
+        transform: translateY(2px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.at-stage-name-text {
+    font-size: 11.5px;
+    font-weight: 600;
+    color: #93c5fd;
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 190px;
+}
+
+.at-stage-counter {
+    font-size: 9.5px;
+    font-weight: 500;
+    color: #64748b;
+    background: rgba(255, 255, 255, 0.05);
+    padding: 1px 5px;
+    border-radius: 4px;
+}
+
+/* 参数区块卡片 (增强对比度与紧凑度) */
 .at-meta-section {
     display: flex;
     flex-direction: column;
-    gap: 8px;
-    background-color: #181920;
-    border: 1px solid rgba(255, 255, 255, 0.06);
-    border-radius: 9px;
-    padding: 12px;
+    gap: 6px;
+    background-color: #161822;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 7px;
+    padding: 8px 10px;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
 }
 
 .at-meta-section-header {
@@ -120,21 +252,20 @@
     justify-content: space-between;
     font-size: 11px;
     font-weight: 600;
-    color: #71717a;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
+    color: #9496a1;
+    letter-spacing: 0.3px;
 }
 
 .at-copy-btn {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
-    padding: 2px 8px;
-    font-size: 11px;
+    gap: 3px;
+    padding: 2px 7px;
+    font-size: 10.5px;
     font-weight: 500;
-    border-radius: 5px;
-    background-color: #22232d;
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 4px;
+    background-color: #202330;
+    border: 1px solid rgba(255, 255, 255, 0.09);
     color: #d4d4d8;
     cursor: pointer;
     transition: all 0.15s ease;
@@ -146,45 +277,77 @@
     color: #ffffff;
 }
 
+/* 提示词与反向词文本区 */
 .at-meta-text {
-    font-size: 12px;
-    line-height: 1.55;
+    font-size: 11.5px;
+    line-height: 1.5;
     color: #e4e4e7;
     word-break: break-word;
     white-space: pre-wrap;
-    max-height: 120px;
+    max-height: 110px;
     overflow-y: auto;
-    background-color: #111216;
-    padding: 10px;
-    border-radius: 6px;
-    border: 1px solid rgba(255, 255, 255, 0.04);
+    background-color: #0f1016;
+    padding: 6px 8px;
+    border-radius: 5px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
     user-select: text;
+}
+
+.at-meta-text-empty {
+    color: #52525b;
+    font-size: 11px;
+    font-style: italic;
+    padding: 3px 2px;
+}
+
+/* 超细简单滑块 (Ultra-thin Minimal Scrollbar) */
+.at-thin-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
+}
+
+.at-thin-scrollbar::-webkit-scrollbar {
+    width: 3px;
+    height: 3px;
+}
+
+.at-thin-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.at-thin-scrollbar::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.16);
+    border-radius: 9999px;
+}
+
+.at-thin-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: rgba(96, 165, 250, 0.55);
 }
 
 /* 参数网格 */
 .at-meta-grid {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
-    gap: 8px;
+    gap: 5px;
 }
 
 .at-meta-item {
     display: flex;
     flex-direction: column;
-    gap: 2px;
-    background-color: #121318;
-    padding: 8px 10px;
-    border-radius: 6px;
-    border: 1px solid rgba(255, 255, 255, 0.04);
+    gap: 1px;
+    background-color: #101117;
+    padding: 5px 8px;
+    border-radius: 5px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .at-meta-item-label {
-    font-size: 10.5px;
+    font-size: 10px;
     color: #71717a;
 }
 
 .at-meta-item-val {
-    font-size: 12px;
+    font-size: 11.5px;
     font-weight: 600;
     color: #f4f4f5;
     overflow: hidden;
@@ -192,16 +355,16 @@
     white-space: nowrap;
 }
 
-/* LoRA 标签 */
+/* LoRA 标签 (紧凑药丸) */
 .at-lora-pills {
     display: flex;
     flex-wrap: wrap;
-    gap: 6px;
+    gap: 4px;
 }
 
 .at-lora-pill {
-    font-size: 11px;
-    padding: 3px 10px;
+    font-size: 10.5px;
+    padding: 2px 7px;
     border-radius: 9999px;
     background-color: rgba(37, 99, 235, 0.12);
     border: 1px solid rgba(59, 130, 246, 0.25);
@@ -209,4 +372,16 @@
     display: inline-flex;
     align-items: center;
     gap: 4px;
+    max-width: 100%;
+}
+
+.at-lora-pill-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.at-lora-pill-val {
+    color: #60a5fa;
+    font-weight: 600;
 }
